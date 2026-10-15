@@ -3,11 +3,11 @@
 Krill 个人账号用量助手，提供 Windows 与 macOS 两套原生客户端：
 
 - **Windows**：C# / .NET 10 / WPF，桌面悬浮球，支持贴边收成进度竖条，点击展开详情。
-- **macOS**：Swift 6 / SwiftUI，菜单栏进度环，点击展开详情面板。macOS 14 起运行；macOS 26 上可为导航与工具按钮使用 Liquid Glass。
+- **macOS**：Swift 6 / AppKit / SwiftUI，菜单栏磷虾 Logo 与额度进度环，点击展开详情面板。macOS 14 起运行；macOS 26 上可为导航与工具按钮使用 Liquid Glass。
 
 两端均显示个人资料、套餐周期剩余、充值余额、福利余额、结转额度、今日统计和公告，使用网站现有 GitHub 登录，并可跳转官网管理账号。详情面板沿用相同的五个页签与深色薄荷绿配色。
 
-**macOS 当前为在 Windows 上编写的源代码版本，尚未经过 Apple Swift 编译、链接与真机验证。** 仓库提供迁移到 Mac 后的构建脚本、Swift 测试、应用包配置及验收步骤。
+macOS 已在 Apple Silicon / Apple Swift 6.4 环境通过测试、Release 编译和 ad-hoc 签名检查。应用使用 AppKit 生命周期，启动仅常驻菜单栏；详情面板使用 SwiftUI。真实账号登录、旧版 macOS 与 Intel 架构仍需验收，具体边界见 [macOS 开发文档](docs/macos.md)。
 
 ## 项目结构
 
@@ -25,7 +25,9 @@ apps/
       Services/               状态管理、钥匙串、WKWebView 登录
       Views/                  SwiftUI 五页详情面板与主题
     Tests/KrillCoreTests/      Swift 契约测试
+    Tests/KrillMacTests/       菜单栏图标与 WebKit 回调回归测试
     Support/Info.plist         .app 包配置与菜单栏应用标识
+    Support/Assets/            应用图标源文件、PNG 与 ICNS
 contracts/fixtures/            两端共用的虚构 JSON 样例，无账号凭据
 docs/                         平台开发、协议与迁移说明
 scripts/windows/              Windows 构建验证与发布
@@ -55,7 +57,7 @@ dotnet run --project apps/windows/src/Krill.Desktop -- --demo
 将完整仓库复制到 Mac，安装 Xcode 与命令行工具，然后从仓库根目录执行：
 
 ```bash
-# 编译并执行 Swift 核心测试，再编译 macOS UI
+# 执行 Swift 核心与 macOS 回归测试，再编译并检查应用入口
 bash scripts/macos/verify.sh
 
 # 创建本机架构的应用包
@@ -73,4 +75,4 @@ swift run --package-path apps/macos KrillMac --demo
 
 `--demo` 使用虚构数据和独立配置目录。`record.har` 仅作为本地协议参考，已忽略，不参与构建或打包。请不要将个人 HAR、会话、授权码或 token 提交到仓库。
 
-Windows 的实际验证结果与 macOS 上尚待完成的验证分别记录在平台文档中。接口来自官网当前实现，协议变化时需要同步更新两端客户端与共用样例。自动更新和跨设备会话同步尚未实现。
+两端的验证结果与尚待完成的验收分别记录在平台文档中。接口来自官网当前实现，协议变化时需要同步更新两端客户端与共用样例。自动更新和跨设备会话同步尚未实现。

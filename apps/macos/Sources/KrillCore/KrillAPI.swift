@@ -60,7 +60,7 @@ public actor KrillAPI {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("zh-CN", forHTTPHeaderField: "X-Language")
         request.setValue("zh-CN", forHTTPHeaderField: "Accept-Language")
-        request.setValue("KrillDesktop-macOS/0.1.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("KrillDesktop-macOS/0.1.3", forHTTPHeaderField: "User-Agent")
         if let token {
             guard KrillOrigin.isPlausibleSession(token) else { throw APIFailure.sessionExpired }
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")

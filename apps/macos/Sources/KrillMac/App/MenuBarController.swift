@@ -28,40 +28,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
     private func updateStatus() {
         guard let button = statusItem.button else { return }
-        button.image = progressIcon(); button.title = store.preferences.showPercentage ? " " + store.menuText : ""
+        button.image = MenuBarIcon.image(percent: store.percent, needsLogin: store.needsLogin, isStale: store.isStale)
+        button.title = store.preferences.showPercentage ? " " + store.menuText : ""
         button.toolTip = store.menuTooltip
         button.setAccessibilityValue(store.menuTooltip)
         popover.behavior = store.preferences.panelPinned ? .applicationDefined : .transient
-    }
-    private func progressIcon() -> NSImage {
-        let size = NSSize(width: 22, height: 22)
-        let percent = store.percent
-        let needsLogin = store.needsLogin
-        let stale = store.isStale
-        let balanceOnly = store.hasData && store.selectedPlan == nil
-        let image = NSImage(size: size, flipped: false) { rect in
-            let center = NSPoint(x: rect.midX, y: rect.midY)
-            let track = NSBezierPath(ovalIn: NSRect(x: 3, y: 3, width: 16, height: 16))
-            track.lineWidth = 2; NSColor.labelColor.withAlphaComponent(0.25).setStroke(); track.stroke()
-            NSColor.labelColor.setStroke()
-            if let percent, !needsLogin {
-                let arc = NSBezierPath(); arc.lineWidth = 2.4; arc.lineCapStyle = .round
-                if percent >= 100 { arc.appendOval(in: NSRect(x: 3, y: 3, width: 16, height: 16)) }
-                else if percent > 0 { arc.appendArc(withCenter: center, radius: 8, startAngle: 90, endAngle: 90 - CGFloat(percent) * 3.6, clockwise: true) }
-                arc.stroke()
-            }
-            let symbol = needsLogin ? "person.crop.circle.badge.questionmark" : percent == nil ? (balanceOnly ? "dollarsign" : "minus") : ""
-            if !symbol.isEmpty, let icon = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
-                icon.draw(in: NSRect(x: 6, y: 6, width: 10, height: 10))
-            }
-            if stale {
-                NSColor.labelColor.setFill(); NSBezierPath(ovalIn: NSRect(x: 16, y: 1, width: 4, height: 4)).fill()
-            }
-            return true
-        }
-        // Template rendering keeps the icon legible in light/dark menu bars and fullscreen spaces.
-        image.isTemplate = true
-        return image
     }
     @objc private func statusClicked(_ sender: Any?) {
         if NSApp.currentEvent?.type == .rightMouseUp { showMenu(); return }

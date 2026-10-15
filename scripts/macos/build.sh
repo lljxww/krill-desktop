@@ -24,6 +24,7 @@ app_bundle="$output_dir/Krill Desktop.app"
 mkdir -p "$app_bundle/Contents/MacOS" "$app_bundle/Contents/Resources"
 cp "$binary_dir/KrillMac" "$app_bundle/Contents/MacOS/KrillMac"
 cp "$package_dir/Support/Info.plist" "$app_bundle/Contents/Info.plist"
+cp "$package_dir/Support/Assets/AppIcon.icns" "$app_bundle/Contents/Resources/AppIcon.icns"
 /usr/bin/plutil -lint "$app_bundle/Contents/Info.plist"
 if [[ -n "${KRILL_SIGN_IDENTITY:-}" ]]; then
   /usr/bin/codesign --force --options runtime --timestamp --sign "$KRILL_SIGN_IDENTITY" "$app_bundle"

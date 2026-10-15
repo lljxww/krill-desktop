@@ -262,7 +262,7 @@ struct DashboardView: View {
                 }
             }
             HStack {
-                Text("KRILL DESKTOP / macOS · 0.1.1").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
+                Text("KRILL DESKTOP / macOS · 0.1.3").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
                 Spacer(); Button("退出程序") { NSApp.terminate(nil) }.foregroundStyle(Color(red: 0.86, green: 0.67, blue: 0.65))
             }
         }
