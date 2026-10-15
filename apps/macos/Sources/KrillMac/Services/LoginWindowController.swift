@@ -57,7 +57,7 @@ final class LoginWindowController: NSObject, NSWindowDelegate, WKNavigationDeleg
         webView = nil; window = nil; didClose?()
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
         // Subresources retain the website's own policy; restrict every top-level or new-window navigation.
         if navigationAction.targetFrame?.isMainFrame == false { decisionHandler(.allow); return }
         guard KrillOrigin.allowsLoginNavigation(navigationAction.request.url) else {
@@ -67,7 +67,7 @@ final class LoginWindowController: NSObject, NSWindowDelegate, WKNavigationDeleg
         decisionHandler(.allow)
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
-                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void) {
         decisionHandler(navigationResponse.canShowMIMEType ? .allow : .cancel)
     }
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,

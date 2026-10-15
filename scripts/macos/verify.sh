@@ -7,4 +7,11 @@ swift --version
 /usr/bin/plutil -lint "$package_dir/Support/Info.plist"
 swift test --package-path "$package_dir"
 swift build --package-path "$package_dir" -c release --product KrillMac
-echo "PASS Swift core tests and macOS application compilation. GUI/login still require manual verification."
+binary_dir="$(swift build --package-path "$package_dir" -c release --show-bin-path)"
+symbols="$(/usr/bin/nm -u "$binary_dir/KrillMac" | xcrun swift-demangle)"
+# An empty SwiftUI Settings scene can create a blank window when the accessory app activates.
+if [[ "$symbols" == *"SwiftUI.Settings"* || "$symbols" == *"SwiftUI.App.main()"* || "$symbols" == *"SwiftUI.NSApplicationDelegateAdaptor"* ]]; then
+  echo "FAIL: the menu-bar application must use the AppKit entry point without SwiftUI window scenes." >&2
+  exit 1
+fi
+echo "PASS Swift tests, macOS compilation, and AppKit-only application entry point. GUI/login still require manual verification."

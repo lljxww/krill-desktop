@@ -11,7 +11,8 @@ let package = Package(
     targets: [
         .target(name: "KrillCore"),
         .executableTarget(name: "KrillMac", dependencies: ["KrillCore"]),
-        .testTarget(name: "KrillCoreTests", dependencies: ["KrillCore"])
+        .testTarget(name: "KrillCoreTests", dependencies: ["KrillCore"]),
+        .testTarget(name: "KrillMacTests", dependencies: ["KrillMac"])
     ],
     swiftLanguageModes: [.v6]
 )

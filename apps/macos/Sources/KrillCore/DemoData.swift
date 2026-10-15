@@ -15,10 +15,13 @@ public enum DemoData {
     }
     public static func stats(now: Date = Date()) -> RequestStats {
         let start = Calendar.current.startOfDay(for: now)
+        let trend: [TrendBucket] = (0..<24).map { (hour: Int) -> TrendBucket in
+            let requests = Int64((hour * 7 + 3) % 19)
+            let cost = Decimal((hour * 13 + 5) % 29) / Decimal(10)
+            return TrendBucket(start: start.addingTimeInterval(Double(hour) * 3600), requests: requests, cost: cost)
+        }
         return RequestStats(requests: 128, successes: 126, tokens: 1_284_600, input: 1_046_200, output: 238_400,
-                            cost: Decimal(string: "7.42")!, trend: (0..<24).map { hour in
-            TrendBucket(start: start.addingTimeInterval(Double(hour) * 3600), requests: Int64((hour * 7 + 3) % 19), cost: Decimal((hour * 13 + 5) % 29) / 10)
-        })
+                            cost: Decimal(string: "7.42")!, trend: trend)
     }
     public static func announcements(now: Date = Date()) -> [Announcement] {
         [Announcement(id: 3, title: "欢迎使用 Krill Desktop", summary: "额度、余额与套餐，一眼就能看见。此处为虚构演示内容。", date: now.addingTimeInterval(-7200)),

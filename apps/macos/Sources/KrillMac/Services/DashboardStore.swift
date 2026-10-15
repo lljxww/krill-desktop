@@ -55,9 +55,9 @@ final class DashboardStore: ObservableObject {
             } catch { statusDetail = "暂时无法读取钥匙串，解锁后重新连接账号。" }
         }
     }
-    var plans: [Subscription] { (subscriptions?.subscriptions ?? []).sorted { $0.consumePriority < $1.consumePriority } }
-    var activePlans: [Subscription] { plans.filter { $0.isActive() } }
-    var selectedPlan: Subscription? { activePlans.first { $0.id == preferences.selectedSubscriptionID } ?? activePlans.first }
+    var plans: [KrillCore.Subscription] { (subscriptions?.subscriptions ?? []).sorted { $0.consumePriority < $1.consumePriority } }
+    var activePlans: [KrillCore.Subscription] { plans.filter { $0.isActive() } }
+    var selectedPlan: KrillCore.Subscription? { activePlans.first { $0.id == preferences.selectedSubscriptionID } ?? activePlans.first }
     var quota: QuotaProjection? { selectedPlan.map(QuotaProjection.init) }
     var percent: Double? { quota?.percent }
     var hasData: Bool { subscriptions != nil }

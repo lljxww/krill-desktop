@@ -31,6 +31,20 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(DisplayFormat.cost(stats.totalCostUsd), "$0.0007")
         XCTAssertEqual(stats.trend.first?.requestCount, 9)
     }
+    func testDemoStatsPreserveHourlyTrend() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let stats = DemoData.stats(now: now)
+        let start = Calendar.current.startOfDay(for: now)
+        XCTAssertEqual(stats.totalRequests, 128)
+        XCTAssertEqual(stats.totalCostUsd, Decimal(string: "7.42"))
+        XCTAssertEqual(stats.trend.count, 24)
+        XCTAssertEqual(stats.trend.first?.bucketStart, start)
+        XCTAssertEqual(stats.trend.first?.requestCount, 3)
+        XCTAssertEqual(stats.trend.first?.totalCostUsd, Decimal(string: "0.5"))
+        XCTAssertEqual(stats.trend.last?.bucketStart, start.addingTimeInterval(23 * 3600))
+        XCTAssertEqual(stats.trend.last?.requestCount, 12)
+        XCTAssertEqual(stats.trend.last?.totalCostUsd, Decimal(string: "1.4"))
+    }
     func testMissingAndZeroQuotaStayUnknownAndPercentIsClamped() {
         var q = Quota(); q.dailyLimitUsd = 0; q.remainingUsd = 0
         func projection(_ quota: Quota) -> QuotaProjection {
