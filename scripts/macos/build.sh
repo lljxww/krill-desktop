@@ -1,0 +1,35 @@
+#!/bin/bash
+set -euo pipefail
+if [[ "$(uname -s)" != Darwin ]]; then
+  echo "This script requires macOS and the Xcode command-line tools." >&2
+  exit 1
+fi
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+package_dir="$repo_root/apps/macos"
+configuration="${1:-release}"
+case "$configuration" in debug|release) ;; *) echo "Usage: bash scripts/macos/build.sh [debug|release] [--universal]" >&2; exit 2 ;; esac
+build_args=(--package-path "$package_dir" -c "$configuration")
+flavor="$(uname -m)"
+if [[ "${2:-}" == --universal ]]; then
+  build_args+=(--arch arm64 --arch x86_64)
+  flavor=universal
+elif [[ -n "${2:-}" ]]; then
+  echo "Unknown option: $2" >&2; exit 2
+fi
+swift build "${build_args[@]}" --product KrillMac
+binary_dir="$(swift build "${build_args[@]}" --show-bin-path)"
+version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$package_dir/Support/Info.plist")"
+output_dir="$repo_root/dist/Krill.Desktop-$version-macos-$flavor-$configuration"
+app_bundle="$output_dir/Krill Desktop.app"
+mkdir -p "$app_bundle/Contents/MacOS" "$app_bundle/Contents/Resources"
+cp "$binary_dir/KrillMac" "$app_bundle/Contents/MacOS/KrillMac"
+cp "$package_dir/Support/Info.plist" "$app_bundle/Contents/Info.plist"
+/usr/bin/plutil -lint "$app_bundle/Contents/Info.plist"
+if [[ -n "${KRILL_SIGN_IDENTITY:-}" ]]; then
+  /usr/bin/codesign --force --options runtime --timestamp --sign "$KRILL_SIGN_IDENTITY" "$app_bundle"
+else
+  /usr/bin/codesign --force --sign - "$app_bundle"
+fi
+/usr/bin/codesign --verify --strict "$app_bundle"
+echo "$app_bundle"
+echo "Launch: open \"$app_bundle\" --args --demo"

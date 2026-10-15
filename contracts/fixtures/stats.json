@@ -1,0 +1,8 @@
+{
+  "success": true, "code": 200,
+  "data": {
+    "total_requests": "128", "success_requests": 126, "failed_requests": 2,
+    "total_tokens": "1284600", "input_tokens": 1046200, "output_tokens": "238400", "total_cost_usd": "0.0007",
+    "trend": [{"bucket_start": "2026-10-15T01:00:00Z", "request_count": "9", "total_tokens": 12345, "total_cost_usd": "0.0007"}]
+  }
+}

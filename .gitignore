@@ -1,0 +1,85 @@
+# Build outputs and release packages
+**/[Bb]in/
+**/[Oo]bj/
+/artifacts/
+/dist/
+*.nupkg
+*.snupkg
+
+# Visual Studio / Rider / per-machine .NET configuration
+.vs/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+*.userosscache
+*.sln.ide
+Directory.Build.local.props
+Directory.Build.local.targets
+*.pubxml.user
+
+# Test results and coverage
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+
+# Swift Package Manager / Xcode user state and build products
+**/.build/
+**/.swiftpm/
+**/DerivedData/
+**/build/
+**/xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+*.xcarchive/
+*.dSYM/
+*.dSYM.zip
+*.app/
+*.dmg
+*.pkg
+*.ipa
+
+# Python source-check tooling
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local account/browser data and diagnostics
+*.har
+*.log
+session.dat
+settings.json
+*.keychain
+*.keychain-db
+
+# Environment files and private signing material (keep example configuration)
+.env
+.env.*
+!.env.example
+!.env.template
+*.pfx
+*.p12
+*.p8
+*.key
+*.pem
+*.mobileprovision
+*.provisionprofile
+
+# Operating-system and editor temporary files
+.DS_Store
+._*
+.Spotlight-V100/
+.Trashes/
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~

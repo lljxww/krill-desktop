@@ -1,0 +1,111 @@
+# Krill Desktop · Windows
+
+以下开发命令均从仓库根目录执行。跨平台目录说明见 [README](../README.md)。
+
+Windows 上的 Krill 账号用量助手：悬浮球常驻桌面，点击展开原生详情面板，快速查看套餐剩余、余额、今日用量和公告。
+
+技术栈：.NET 10 LTS、WPF、CommunityToolkit.Mvvm、WebView2。界面与后台请求均在本机运行，无额外服务端。
+
+## 使用
+
+1. 将发布 ZIP 完整解压到一个目录，运行 `Krill.Desktop.exe`。自包含版本不需要另外安装 .NET。
+2. 在面板中点击“使用 GitHub 连接”，在官网原有页面完成 GitHub 登录及可能出现的二次验证。连接成功后登录窗口自动关闭。
+3. 单击悬浮球展开或收起面板；拖动悬浮球改变位置。面板按 `Esc` 收起，后台继续运行。
+   开启贴边时，球体靠左 / 右边缘后自动收缩为 16 个逻辑像素宽的进度竖条，从底部向上显示当前套餐剩余比例。鼠标移入展开为圆球，移开约 0.65 秒后收起；直接点击仍可进入详情。关闭贴边选项恢复圆球。
+4. 在“套餐”页选择悬浮球显示的套餐。在“设置”页调整置顶、贴边、固定面板、后台刷新和开机启动。
+5. 托盘菜单提供显示 / 隐藏悬浮球、打开面板、刷新、打开官网和退出程序。
+
+首次连接需要在 WebView2 中登录 GitHub。它与 Chrome / Edge 的现有登录状态独立；“打开官网”使用默认浏览器自己的登录状态。
+
+登录窗口依赖 Microsoft Edge WebView2 Runtime。缺失时程序会提示，并提供微软官方下载页面入口。程序不会自动安装运行时。
+
+## 展示与刷新规则
+
+- 悬浮球显示所选有效套餐的当前周期剩余百分比。没有有效套餐时显示充值余额；未知数据显示 `—`。
+- 充值余额、福利余额和结转额度分别显示。金额沿用官网的 USD 口径，使用 `decimal` 解析。
+- 日 / 周 / 月额度依据服务端套餐类型及周期字段展示。重置时间使用服务端返回值，并转为本机时区显示。
+- 常驻默认每 60 秒同步核心数据，展开面板时最多每 30 秒同步。详细统计在面板展开时加载，公告约每 10 分钟检查一次。
+- 请求失败后逐步延长重试间隔，保留当前进程最近一次成功读取的数据，并标记离线。HTTP 401 或业务 401 提示重新登录。
+- 公告以原生文字展示标题与摘要，点击打开官网完整内容。首版显示最近 50 条公告。
+- 按次 / 积分类套餐仅在返回了可识别的额度字段时显示具体用量；未知字段保留 `—`，可前往官网核对。
+
+“今日用量”使用本机时区当天零点至当前时间的统计范围，与套餐额度的计费窗口分别计算。
+
+## 演示模式
+
+```powershell
+.\Krill.Desktop.exe --demo
+```
+
+演示模式使用代码生成的虚构数据，界面显示“演示数据”，不会读取 HAR 中的凭据，也不会请求个人账号接口。演示模式与正常模式的默认数据目录分开。
+
+## 本地数据与登录
+
+默认目录：
+
+- 正常模式：`%LOCALAPPDATA%\KrillDesktop\Account`
+- 演示模式：`%LOCALAPPDATA%\KrillDesktop\Demo`
+
+`settings.json` 保存位置与展示偏好；`session.dat` 使用 Windows DPAPI 按当前用户加密保存 Krill 会话。退出账号会清除本机凭据和当前面板数据。桌面端退出不会撤销官网或 GitHub 中已有的登录。
+
+登录 WebView2 使用 InPrivate 模式，不保留可复用的 GitHub 浏览会话。程序只在精确的 `https://www.krill-code.com` 来源中读取 Krill 会话，并通过 `/api/auth/me` 确认身份。凭据仅发送至固定的 Krill API 域名，HTTP 客户端不自动跟随重定向。
+
+诊断日志只记录事件名和异常类型，不记录请求头、请求体、响应内容、授权码或 token。HAR 只作为本地协议参考，已在 `.gitignore` 中排除，不参与打包。
+
+## 开发
+
+需要 .NET 10 SDK，Windows x64。
+
+```powershell
+dotnet build Krill.Desktop.slnx -c Release
+dotnet run --project apps/windows/src/Krill.Desktop -- --demo
+```
+
+项目结构：
+
+```text
+apps/windows/src/Krill.Core          接口客户端、协议模型、额度投影、显示规则、虚构样例
+apps/windows/src/Krill.Desktop       WPF 界面、登录窗口、托盘、本地存储、刷新与窗口定位
+apps/windows/tests/Krill.Core.Tests  无外部测试框架依赖的契约检查程序
+scripts/windows/verify.ps1          构建、契约检查、原生界面状态与渲染检查
+scripts/windows/publish.ps1         Windows x64 发布与压缩打包
+```
+
+## 检查
+
+```powershell
+# 构建、离线契约检查与演示界面检查
+.\scripts\verify.ps1
+
+# 额外检查本地 HAR 响应兼容性，以及匿名的公开公告接口
+.\scripts\verify.ps1 -HarPath .\record.har -LivePublic
+```
+
+也可单独运行核心检查：
+
+```powershell
+dotnet run --project apps/windows/tests/Krill.Core.Tests -c Release
+```
+
+界面检查运行真实 WPF 窗口，以虚构数据验证五个页签的渲染、套餐切换对悬浮球的更新、离线保留数据、会话失效、退出清理及 DPAPI 往返。截图和结果写入 `artifacts/ui`。它不代替真实鼠标、托盘和多屏 DPI 操作的人工验收。
+
+检查模式使用单独的 `SmokeTest` 数据子目录，不会覆盖正常账号凭据。
+
+Windows 的检查程序包含 17 项核心契约检查（含两份与 Swift 共用的合成协议样例）和 14 项 WPF 状态 / 渲染检查。此前已额外验证本地 HAR 中 5 份核心响应的类型兼容，以及匿名公开公告接口。真实 GitHub 登录、真实账号接口联调、登录恢复与失效周期，以及鼠标拖动 / 多屏体验，仍需实际使用验证。
+
+## 发布
+
+```powershell
+.\scripts\publish.ps1
+```
+
+默认生成自包含版本：
+
+- `dist/Krill.Desktop-0.1.1-win-x64/Krill.Desktop.exe`
+- `dist/Krill.Desktop-0.1.1-win-x64.zip`
+
+可添加 `-FrameworkDependent` 生成依赖系统 .NET 10 Desktop Runtime 的版本，输出目录与压缩包带 `framework-dependent` 后缀。
+
+根目录 `scripts/verify.ps1` 与 `scripts/publish.ps1` 为兼容入口，将参数转发至 `scripts/windows/`。发布目录中的旧程序不会因源码目录整理自动更新，且运行中的发布包不会被源码验证任务关闭。
+
+首版为个人客户端。接口来自官网当前前端与 HAR，未发现网站对这些接口提供长期兼容承诺；发生协议变化时应更新 `KrillApiClient` 和 DTO。首版会话失效后通过官网重新登录，自动更新暂未加入。
