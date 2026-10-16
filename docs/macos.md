@@ -26,6 +26,8 @@ AppKit 负责应用事件循环、菜单栏、窗口壳、浏览器和系统存�
 
 详情面板宽约 500 点，高度按当前屏幕工作区限制，内容可滚动；保留 Windows 的五个页签、金额卡片、额度环、统计柱图和底部网站入口。支持固定面板、Esc 收起、手动刷新、选择套餐、公告未读与登录启动。Liquid Glass 仅用于导航与工具控件，金额信息使用深色卡片维持可读性。
 
+导航页签整个按钮区域均可点击，高度至少 40 点。用量页的时段费用图按时间排序，最多展示最近 48 个时段，下方显示本机时区的时间刻度；鼠标在绘图区移动时会显示对应时段的竖向定位线，并在图表上方即时显示日期、时间、费用和请求数。整列空白和零费用柱也能触发提示，未知费用显示为 `—`；移出图表后清除定位，提示区域预留固定高度以避免布局跳动。
+
 ## 第一次在 Mac 上运行
 
 将整个仓库复制到 Mac；可跳过 `.vs`、Windows `bin` / `obj`、`dist`、`artifacts` 和个人 HAR。保留根目录 `contracts/fixtures`，Swift 测试会读取它。不要复制 Windows 本地账号凭据。
@@ -42,7 +44,7 @@ bash scripts/macos/build.sh debug
 构建脚本生成本机架构（Apple Silicon 为 `arm64`，Intel 为 `x86_64`）的完整应用包，例如：
 
 ```bash
-open "dist/Krill.Desktop-0.1.3-macos-arm64-debug/Krill Desktop.app" --args --demo
+open "dist/Krill.Desktop-0.1.4-macos-arm64-debug/Krill Desktop.app" --args --demo
 ```
 
 关闭演示实例后，去掉 `--demo` 启动账号模式。正常模式、演示模式和登录启动均默认只在顶部菜单栏常驻，不自动展开详情；再次打开已运行的应用也不弹出面板。点击菜单栏图标，或在其右键菜单选择“打开详情”，即可查看面板。旧的 `--background` 参数仍可使用，但无需再显式传入。

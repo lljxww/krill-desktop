@@ -65,9 +65,10 @@ struct DashboardView: View {
             ForEach(DashboardTab.allCases) { tab in
                 Button { store.tab = tab } label: {
                     Text(tab.rawValue).font(.system(size: 12, weight: store.tab == tab ? .semibold : .regular))
-                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, minHeight: 40)
                         .foregroundStyle(store.tab == tab ? KrillTheme.mint : KrillTheme.muted)
                         .background(store.tab == tab ? KrillTheme.mint.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 9))
+                        .contentShape(Rectangle())
                 }.accessibilityAddTraits(store.tab == tab ? .isSelected : [])
             }
         }.padding(4).modifier(GlassSurface(enabled: store.preferences.useLiquidGlass))
@@ -184,8 +185,7 @@ struct DashboardView: View {
             }
             Card {
                 Text("时段费用").fontWeight(.semibold)
-                trendChart
-                Text("悬停柱形查看对应时段费用与请求数").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
+                UsageTrendChart(buckets: store.stats?.trend ?? [])
             }
             Card {
                 detailRow("请求成功率", value: store.stats.flatMap { $0.totalRequests > 0 ? String(format: "%.1f%%", Double($0.successRequests) / Double($0.totalRequests) * 100) : nil } ?? "—")
@@ -194,22 +194,6 @@ struct DashboardView: View {
             }
             Button("在官网查看完整用量记录 ↗") { store.openWebsite(.logs) }.foregroundStyle(KrillTheme.mint)
         }
-    }
-    private var trendChart: some View {
-        let buckets = Array((store.stats?.trend ?? []).suffix(48))
-        let maximum = buckets.compactMap(\.totalCostUsd).max() ?? 0
-        return HStack(alignment: .bottom, spacing: 4) {
-            if buckets.isEmpty {
-                Text("暂无时段统计").foregroundStyle(KrillTheme.muted).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ForEach(Array(buckets.enumerated()), id: \.offset) { _, bucket in
-                    let proportion = maximum > 0 ? NSDecimalNumber(decimal: (bucket.totalCostUsd ?? 0) / maximum).doubleValue : 0
-                    RoundedRectangle(cornerRadius: 2).fill(KrillTheme.mint.opacity(0.85))
-                        .frame(maxWidth: .infinity).frame(height: CGFloat(max(3, min(88, proportion * 88))))
-                        .help("\(DisplayFormat.date(bucket.bucketStart)) · \(DisplayFormat.cost(bucket.totalCostUsd)) · \(bucket.requestCount) 次请求")
-                }
-            }
-        }.frame(height: 104, alignment: .bottom).padding(.top, 4)
     }
     private var announcements: some View {
         VStack(alignment: .leading, spacing: 16) {
