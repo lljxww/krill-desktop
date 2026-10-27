@@ -48,20 +48,29 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         popover.behavior = store.preferences.panelPinned ? .applicationDefined : .transient
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        Self.clearInitialFocus(in: popover.contentViewController?.view.window)
         NSApp.activate(ignoringOtherApps: true)
         store.isPanelVisible = true; store.synchronizeLaunchStatus(); store.requestRefresh()
     }
     func hidePanel() { popover.performClose(nil); store.isPanelVisible = false }
     func popoverDidClose(_ notification: Notification) { store.isPanelVisible = false }
+    func popoverDidShow(_ notification: Notification) {
+        Self.clearInitialFocus(in: popover.contentViewController?.view.window)
+    }
+    static func clearInitialFocus(in window: NSWindow?) {
+        // Let Tab choose a control after opening; no button receives focus automatically.
+        window?.makeFirstResponder(nil)
+    }
     private func showMenu() {
         let menu = NSMenu()
         let entries: [(String, Selector)] = [("打开详情", #selector(openFromMenu)), ("立即刷新", #selector(refreshFromMenu)),
-                                             ("打开官网", #selector(websiteFromMenu)), ("退出 Krill Desktop", #selector(quitFromMenu))]
+                                             ("检查更新", #selector(updateFromMenu)), ("打开官网", #selector(websiteFromMenu)), ("退出 Krill Desktop", #selector(quitFromMenu))]
         for (title, action) in entries { let item = menu.addItem(withTitle: title, action: action, keyEquivalent: ""); item.target = self }
         statusItem.menu = menu; statusItem.button?.performClick(nil); statusItem.menu = nil
     }
     @objc private func openFromMenu() { showPanel() }
     @objc private func refreshFromMenu() { store.requestRefresh() }
     @objc private func websiteFromMenu() { store.openWebsite() }
+    @objc private func updateFromMenu() { store.tab = .settings; showPanel(); store.updater.checkNow() }
     @objc private func quitFromMenu() { NSApp.terminate(nil) }
 }

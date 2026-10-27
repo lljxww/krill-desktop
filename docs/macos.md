@@ -67,7 +67,9 @@ KRILL_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
   bash scripts/macos/build.sh release --universal
 ```
 
-脚本将可执行文件和 `Support/Info.plist` 放入标准 `.app/Contents` 结构，默认使用本机 ad-hoc 签名；提供身份时使用 Hardened Runtime 与时间戳。公证、安装镜像、App Store 分发与自动更新尚未实现。开发时应用包位置和签名变化可能触发钥匙串重新授权，应在 Mac 上实际确认；不要用日志打印 token 来诊断。
+脚本将可执行文件和 `Support/Info.plist` 放入标准 `.app/Contents` 结构，默认使用本机 ad-hoc 签名；提供身份时使用 Hardened Runtime 与时间戳。Release 构建同时生成自动更新使用的 ZIP。默认版本读取根目录 `VERSION`，可通过 `KRILL_VERSION` 覆盖；推送 `vX.Y.Z` tag 后由 GitHub Actions 自动发布，详见 [版本发布与应用更新](releases.md)。公证、安装镜像与 App Store 分发尚未实现。开发时应用包位置和签名变化可能触发钥匙串重新授权，应在 Mac 上实际确认；不要用日志打印 token 来诊断。
+
+账号模式启动后及每 6 小时自动检查 GitHub 正式 Release，发现新版后显示“下载并重启更新”。详情面板打开时清除默认控件焦点，之后仍可通过 Tab 导航。更新安装会验证 SHA-256、包内版本、应用标识和代码签名；替换失败时尝试回滚。需从可写固定目录中的 `.app` 运行。
 
 使用 `SMAppService.mainApp` 注册登录项。建议把应用复制到固定的 Applications 目录后再开启登录启动；需要系统批准时，设置页提供打开“登录项”的按钮。演示 / 正常模式请逐个退出再启动，避免同时显示多个菜单栏图标。
 

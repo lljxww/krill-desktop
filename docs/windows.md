@@ -91,7 +91,7 @@ dotnet run --project apps/windows/tests/Krill.Core.Tests -c Release
 
 检查模式使用单独的 `SmokeTest` 数据子目录，不会覆盖正常账号凭据。
 
-Windows 的检查程序包含 17 项核心契约检查（含两份与 Swift 共用的合成协议样例）和 14 项 WPF 状态 / 渲染检查。此前已额外验证本地 HAR 中 5 份核心响应的类型兼容，以及匿名公开公告接口。真实 GitHub 登录、真实账号接口联调、登录恢复与失效周期，以及鼠标拖动 / 多屏体验，仍需实际使用验证。
+Windows 的检查程序包含 20 项核心与更新契约检查（含两份与 Swift 共用的合成协议样例）、更新安装组件的替换 / 参数 / 回滚检查和 15 项 WPF 状态 / 渲染检查。此前已额外验证本地 HAR 中 5 份核心响应的类型兼容，以及匿名公开公告接口。真实 GitHub 登录、真实账号接口联调、登录恢复与失效周期，以及鼠标拖动 / 多屏体验，仍需实际使用验证。
 
 ## 发布
 
@@ -101,11 +101,15 @@ Windows 的检查程序包含 17 项核心契约检查（含两份与 Swift 共�
 
 默认生成自包含版本：
 
-- `dist/Krill.Desktop-0.1.1-win-x64/Krill.Desktop.exe`
-- `dist/Krill.Desktop-0.1.1-win-x64.zip`
+- `dist/Krill.Desktop-0.1.4-win-x64/Krill.Desktop.exe`
+- `dist/Krill.Desktop-0.1.4-win-x64.zip`
 
 可添加 `-FrameworkDependent` 生成依赖系统 .NET 10 Desktop Runtime 的版本，输出目录与压缩包带 `framework-dependent` 后缀。
 
 根目录 `scripts/verify.ps1` 与 `scripts/publish.ps1` 为兼容入口，将参数转发至 `scripts/windows/`。发布目录中的旧程序不会因源码目录整理自动更新，且运行中的发布包不会被源码验证任务关闭。
 
-首版为个人客户端。接口来自官网当前前端与 HAR，未发现网站对这些接口提供长期兼容承诺；发生协议变化时应更新 `KrillApiClient` 和 DTO。首版会话失效后通过官网重新登录，自动更新暂未加入。
+默认版本读取仓库根目录 `VERSION`，可使用 `-Version 0.1.5` 覆盖。推送 `vX.Y.Z` tag 后自动测试、构建并发布两端安装包，详见 [版本发布与应用更新](releases.md)。
+
+账号模式启动后及每 6 小时自动检测 GitHub 正式 Release，托盘菜单和设置页也提供“检查更新”。发现新版后点击“下载并重启更新”，校验 SHA-256 和包内版本后替换程序；失败时尝试恢复原版本。应用目录需可写。详情面板打开时不默认聚焦按钮，保留键盘导航。
+
+首版为个人客户端。接口来自官网当前前端与 HAR，未发现网站对这些接口提供长期兼容承诺；发生协议变化时应更新 `KrillApiClient` 和 DTO。会话失效后通过官网重新登录。

@@ -6,6 +6,44 @@ using Krill.Core;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("Release versions compare numerically and reject unsupported tags", () => Sync(() =>
+    {
+        Equal(true, ReleaseVersion.Parse("v1.10.2")!.CompareTo(ReleaseVersion.Parse("1.9.99")) > 0);
+        foreach (var value in new[] { "1.2", "1.2.3.4", "1.2.3-beta.1", "01.2.3", "1.02.3", "-1.2.3", "1.2.65536", "1.2.٣", "1.2.3\n" })
+            Equal(null, ReleaseVersion.Parse(value));
+    })),
+    ("Shared release contract rejects drafts, downgrades, missing digests and foreign assets", () => Sync(() =>
+    {
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Updates", "latest.json"));
+        var release = JsonSerializer.Deserialize<GitHubRelease>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var current = ReleaseVersion.Parse("1.9.0")!;
+        Equal(1024L, release.UpdateAfter(current, "win-x64")!.Size);
+        Equal(2048L, release.UpdateAfter(current, "macos-universal")!.Size);
+        Equal(null, release.UpdateAfter(current, "win-arm64"));
+        Equal(null, release.UpdateAfter(ReleaseVersion.Parse("1.10.2")!, "win-x64"));
+        Equal(null, release.UpdateAfter(ReleaseVersion.Parse("2.0.0")!, "win-x64"));
+        Equal(null, (release with { Draft = true }).UpdateAfter(current, "win-x64"));
+        Equal(null, (release with { Prerelease = true }).UpdateAfter(current, "win-x64"));
+        var asset = release.Assets[0];
+        foreach (var invalid in new[] { asset with { Digest = null }, asset with { Digest = "sha256:bad" },
+            asset with { Digest = "sha256:" + new string('z', 64) }, asset with { Size = 0 }, asset with { Size = 1_073_741_825 },
+            asset with { BrowserDownloadUrl = "https://evil.example/update.zip" },
+            asset with { BrowserDownloadUrl = asset.BrowserDownloadUrl.Replace("https:", "http:") } })
+            Equal(null, (release with { Assets = [invalid] }).UpdateAfter(current, "win-x64"));
+    })),
+    ("Release checks use GitHub anonymously and handle an unpublished repository", async () =>
+    {
+        using var http = new HttpClient(new Handler(request =>
+        {
+            Equal(GitHubRelease.LatestUrl, request.RequestUri!.AbsoluteUri);
+            Equal(null, request.Headers.Authorization); Equal(false, request.Headers.Contains("Cookie"));
+            Equal(true, request.Headers.UserAgent.Count > 0);
+            return Task.FromResult(Json(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Updates", "latest.json"))));
+        }));
+        Equal("v1.10.2", (await GitHubRelease.LatestAsync(http, default))!.TagName);
+        using var empty = new HttpClient(new Handler(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound))));
+        Equal(null, await GitHubRelease.LatestAsync(empty, default));
+    }),
     ("Shared Windows and macOS subscription fixtures preserve projection rules", () => Sync(() =>
     {
         var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "subscriptions.json"));

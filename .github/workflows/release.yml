@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python3 scripts/release_version.py --tag "$RELEASE_TAG")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Verify Windows
+        shell: pwsh
+        run: ./scripts/windows/verify.ps1
+      - name: Package Windows
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: ./scripts/windows/publish.ps1 -Version $env:RELEASE_VERSION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: dist/Krill.Desktop-*-win-x64.zip
+          if-no-files-found: error
+
+  macos:
+    needs: version
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify macOS
+        run: bash scripts/macos/verify.sh
+      - name: Package macOS universal app
+        env:
+          KRILL_VERSION: ${{ needs.version.outputs.version }}
+        run: bash scripts/macos/build.sh release --universal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: dist/Krill.Desktop-*-macos-universal.zip
+          if-no-files-found: error
+
+  publish:
+    needs: [version, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release'
+          merge-multiple: true
+          path: dist
+      - name: Publish complete release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          test -f "dist/Krill.Desktop-$RELEASE_VERSION-win-x64.zip"
+          test -f "dist/Krill.Desktop-$RELEASE_VERSION-macos-universal.zip"
+          gh release create "$RELEASE_TAG" dist/*.zip --verify-tag --generate-notes --title "Krill Desktop $RELEASE_TAG"

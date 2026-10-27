@@ -32,6 +32,8 @@ contracts/fixtures/            两端共用的虚构 JSON 样例，无账号凭�
 docs/                         平台开发、协议与迁移说明
 scripts/windows/              Windows 构建验证与发布
 scripts/macos/                macOS 验证与 .app 打包
+.github/workflows/release.yml  推送版本 tag 后自动测试、打包与发布
+VERSION                       本地构建的默认版本
 Krill.Desktop.slnx             Windows 解决方案入口
 Directory.Build.props         Windows .NET 公共构建配置
 global.json                   Windows .NET SDK 选择
@@ -75,4 +77,6 @@ swift run --package-path apps/macos KrillMac --demo
 
 `--demo` 使用虚构数据和独立配置目录。`record.har` 仅作为本地协议参考，已忽略，不参与构建或打包。请不要将个人 HAR、会话、授权码或 token 提交到仓库。
 
-两端的验证结果与尚待完成的验收分别记录在平台文档中。接口来自官网当前实现，协议变化时需要同步更新两端客户端与共用样例。自动更新和跨设备会话同步尚未实现。
+两端在账号模式启动后自动检查 GitHub 最新正式 Release，之后每 6 小时检查一次；也可在设置页或菜单中手动检查，发现新版后点击“下载并重启更新”。推送 `vX.Y.Z` tag 会自动测试、构建并发布对应版本的 Windows x64 与 macOS 通用包，操作与运行限制见 [版本发布与应用更新](docs/releases.md)。
+
+两端的验证结果与尚待完成的验收分别记录在平台文档中。接口来自官网当前实现，协议变化时需要同步更新两端客户端与共用样例。跨设备会话同步尚未实现。

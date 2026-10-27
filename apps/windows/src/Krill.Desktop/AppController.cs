@@ -56,7 +56,8 @@ public sealed class AppController : IDisposable
     {
         Orb.Show(); WindowPlacement.InitializeOrb(Orb, _settings);
         Orb.ConfigureDocking(ViewModel.SnapToEdge, snapNow: false);
-        if (withTray) _tray = new TrayService(ShowPanel, ToggleOrb, () => _ = RefreshAsync(), () => OpenWebsite("/app"), Quit);
+        if (withTray) _tray = new TrayService(ShowPanel, ToggleOrb, () => _ = RefreshAsync(), () => OpenWebsite("/app"),
+            () => { ViewModel.SelectedTab = 4; ShowPanel(); ViewModel.Updater.CheckCommand.Execute(null); }, Quit);
         if (demo) UseDemo();
         else
         {
@@ -66,6 +67,7 @@ public sealed class AppController : IDisposable
         if (!background) ShowPanel();
         if (_token is not null) await RefreshAsync(includeDetails: !background);
         if (withLoop) _ = PollAsync(_lifetime.Token);
+        if (withLoop && !demo) ViewModel.Updater.Start();
     }
 
     public void ShowPanel()
@@ -74,6 +76,7 @@ public sealed class AppController : IDisposable
         if (!Orb.IsVisible) Orb.Show();
         WindowPlacement.PlacePanel(Panel, Orb);
         Panel.Show(); Panel.Activate();
+        Panel.ClearInitialFocus();
         // Re-evaluate after WPF has received the destination monitor's DPI change.
         Panel.Dispatcher.BeginInvoke(() => { if (Panel.IsVisible) WindowPlacement.PlacePanel(Panel, Orb); });
         if (!ViewModel.IsDemo && _token is not null) _ = RefreshAsync();
@@ -276,6 +279,7 @@ public sealed class AppController : IDisposable
     {
         if (_disposed) return;
         _disposed = true; _lifetime.Cancel(); _session.Cancel();
+        ViewModel.Updater.Dispose();
         _tray?.Dispose(); _login?.Close();
         Orb.AllowClose = true; Panel.AllowClose = true;
         Orb.Close(); Panel.Close(); _http.Dispose();

@@ -10,6 +10,7 @@ enum DashboardTab: String, CaseIterable, Identifiable {
 
 @MainActor
 final class DashboardStore: ObservableObject {
+    let updater = UpdateService()
     @Published var tab: DashboardTab = .overview {
         didSet { if tab == .usage || tab == .announcements { requestRefresh() } }
     }

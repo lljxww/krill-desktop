@@ -11,6 +11,12 @@ public partial class PanelWindow : Window
 {
     public bool AllowClose { get; set; }
     public PanelWindow() => InitializeComponent();
+    public void ClearInitialFocus() => Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+    {
+        if (!IsVisible) return;
+        FocusManager.SetFocusedElement(this, this);
+        Keyboard.Focus(this);
+    });
     private void HideClick(object sender, RoutedEventArgs e) => Hide();
     private void PinClick(object sender, RoutedEventArgs e)
     { if (DataContext is DashboardViewModel vm) vm.PanelPinned = !vm.PanelPinned; }

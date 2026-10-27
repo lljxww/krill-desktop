@@ -31,6 +31,7 @@ public sealed record ChartBar(double Height, string Tooltip);
 
 public partial class DashboardViewModel : ObservableObject
 {
+    public UpdateService Updater { get; } = new();
     private readonly DashboardActions _actions;
     private readonly ClientSettings _settings;
     private bool _applying;

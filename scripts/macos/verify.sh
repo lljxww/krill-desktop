@@ -3,6 +3,7 @@ set -euo pipefail
 if [[ "$(uname -s)" != Darwin ]]; then echo "Verification requires macOS and Xcode." >&2; exit 1; fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 package_dir="$repo_root/apps/macos"
+python3 -m unittest discover -s "$repo_root/scripts/tests" -v
 swift --version
 /usr/bin/plutil -lint "$package_dir/Support/Info.plist"
 swift test --package-path "$package_dir"

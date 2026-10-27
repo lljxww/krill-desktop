@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             login.didClose = { [weak menuBar] in menuBar?.showPanel() }
             self.store = store; self.menuBar = menuBar; self.login = login
             store.start()
+            if !demo { store.updater.start() }
         } catch {
             let alert = NSAlert(); alert.messageText = "无法启动 Krill Desktop"
             alert.informativeText = "请检查当前用户的应用支持目录是否可读写。"; alert.runModal(); NSApp.terminate(nil)
@@ -38,5 +39,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { false }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { store?.stop(); login?.didClose = nil; login?.close() }
+    func applicationWillTerminate(_ notification: Notification) { store?.updater.stop(); store?.stop(); login?.didClose = nil; login?.close() }
 }

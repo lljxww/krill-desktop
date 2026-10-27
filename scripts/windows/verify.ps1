@@ -1,6 +1,7 @@
 param([string]$HarPath, [switch]$LivePublic)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+& (Join-Path $PSScriptRoot 'test-update.ps1')
 dotnet build (Join-Path $projectRoot 'Krill.Desktop.slnx') -c Release --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 $testArguments = @('run', '--project', (Join-Path $projectRoot 'apps\windows\tests\Krill.Core.Tests'), '-c', 'Release', '--no-build', '--')

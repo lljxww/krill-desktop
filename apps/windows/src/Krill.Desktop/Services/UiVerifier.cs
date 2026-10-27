@@ -18,6 +18,11 @@ internal static class UiVerifier
         app.ViewModel.PanelPinned = true;
         app.ViewModel.AlwaysOnTop = false;
         app.Panel.Show();
+        app.Panel.ClearInitialFocus();
+        await app.Panel.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        if (!ReferenceEquals(System.Windows.Input.FocusManager.GetFocusedElement(app.Panel), app.Panel))
+            throw new InvalidOperationException("Opening the panel focused a control.");
+        checks.Add("panel_opens_without_control_focus");
         var names = new[] { "overview", "plans", "usage", "announcements", "settings" };
         for (var i = 0; i < names.Length; i++)
         {

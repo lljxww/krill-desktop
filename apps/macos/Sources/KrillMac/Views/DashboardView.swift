@@ -11,6 +11,7 @@ struct DashboardView: View {
         VStack(spacing: 0) {
             header
             navigation.padding(.horizontal, 24)
+            UpdateNotice(updater: store.updater)
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if store.isDemo { notice("演示数据", "虚构样例，不代表真实账号。", color: KrillTheme.amber) }
@@ -245,8 +246,9 @@ struct DashboardView: View {
                     if !store.needsLogin { Button("退出账号", role: .destructive) { confirmSignOut = true } }
                 }
             }
+            UpdateSettings(updater: store.updater)
             HStack {
-                Text("KRILL DESKTOP / macOS · 0.1.3").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
+                Text("KRILL DESKTOP / macOS · \(store.updater.currentVersion)").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
                 Spacer(); Button("退出程序") { NSApp.terminate(nil) }.foregroundStyle(Color(red: 0.86, green: 0.67, blue: 0.65))
             }
         }
@@ -278,6 +280,36 @@ struct DashboardView: View {
             .foregroundStyle(color).frame(maxWidth: .infinity, alignment: .leading).padding(12)
             .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(color.opacity(0.25)))
+    }
+}
+
+private struct UpdateNotice: View {
+    @ObservedObject var updater: UpdateService
+    var body: some View {
+        if let version = updater.availableVersion {
+            HStack {
+                Text(updater.isBusy ? updater.status : "新版本 \(version) 可用").font(.system(size: 11))
+                Spacer()
+                Button("下载并重启更新") { updater.install() }.disabled(updater.isBusy).font(.system(size: 11))
+            }.foregroundStyle(KrillTheme.mint).padding(12).background(KrillTheme.mint.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 9)).padding(.horizontal, 24).padding(.top, 10)
+        }
+    }
+}
+
+private struct UpdateSettings: View {
+    @ObservedObject var updater: UpdateService
+    var body: some View {
+        Card {
+            Text("应用更新 · \(updater.currentVersion)").fontWeight(.semibold)
+            Text(updater.status).font(.system(size: 12)).foregroundStyle(KrillTheme.muted)
+            HStack(spacing: 16) {
+                Button("检查更新") { updater.checkNow() }.disabled(updater.isBusy)
+                if updater.availableVersion != nil {
+                    Button("下载并重启更新") { updater.install() }.disabled(updater.isBusy).buttonStyle(.borderedProminent)
+                }
+            }
+        }
     }
 }
 
