@@ -31,7 +31,7 @@ public sealed record ReleaseAsset(
 
 public sealed record GitHubRelease([property: JsonPropertyName("tag_name")] string TagName, bool Draft, bool Prerelease, ReleaseAsset[] Assets)
 {
-    public const string Repository = "lljxww/krill-desktop";
+    public const string Repository = "mac-fantasy/krill-desktop";
     public const string LatestUrl = $"https://api.github.com/repos/{Repository}/releases/latest";
     public ReleaseAsset? UpdateAfter(ReleaseVersion current, string platform)
     {

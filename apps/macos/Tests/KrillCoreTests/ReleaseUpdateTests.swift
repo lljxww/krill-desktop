@@ -33,7 +33,8 @@ final class ReleaseUpdateTests: XCTestCase {
             ["digest": NSNull()], ["digest": "sha256:bad"], ["digest": "sha256:" + String(repeating: "z", count: 64)],
             ["size": 0], ["size": 1_073_741_825],
             ["browser_download_url": "https://evil.example/update.zip"],
-            ["browser_download_url": "http://github.com/lljxww/krill-desktop/releases/download/v1.10.2/Krill.Desktop-1.10.2-macos-universal.zip"]
+            ["browser_download_url": "https://github.com/lljxww/krill-desktop/releases/download/v1.10.2/Krill.Desktop-1.10.2-macos-universal.zip"],
+            ["browser_download_url": "http://github.com/mac-fantasy/krill-desktop/releases/download/v1.10.2/Krill.Desktop-1.10.2-macos-universal.zip"]
         ] {
             let release = try fixture { object in
                 var assets = object["assets"] as! [[String: Any]]

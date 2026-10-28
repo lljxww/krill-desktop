@@ -22,7 +22,7 @@ public struct ReleaseVersion: Comparable, Sendable, CustomStringConvertible {
 }
 
 public struct GitHubRelease: Decodable, Sendable {
-    public static let repository = "lljxww/krill-desktop"
+    public static let repository = "mac-fantasy/krill-desktop"
     public static let latestURL = URL(string: "https://api.github.com/repos/\(repository)/releases/latest")!
     public let tagName: String
     public let draft: Bool

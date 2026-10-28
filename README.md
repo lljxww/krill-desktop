@@ -9,6 +9,23 @@ Krill 个人账号用量助手，提供 Windows 与 macOS 两套原生客户端�
 
 macOS 已在 Apple Silicon / Apple Swift 6.4 环境通过测试、Release 编译和 ad-hoc 签名检查。应用使用 AppKit 生命周期，启动仅常驻菜单栏；详情面板使用 SwiftUI。真实账号登录、旧版 macOS 与 Intel 架构仍需验收，具体边界见 [macOS 开发文档](docs/macos.md)。
 
+## macOS 安装
+
+```bash
+brew install --cask mac-fantasy/tap/krill-desktop
+```
+
+支持 macOS 14+、Apple Silicon 和 Intel；安装源由 [统一 Homebrew tap](https://github.com/mac-fantasy/homebrew-tap) 维护，每 6 小时检查本项目最新稳定版。应用也可以自行下载并安装更新；通过 Homebrew 手动升级时使用：
+
+```bash
+brew update
+brew upgrade --cask --greedy mac-fantasy/tap/krill-desktop
+```
+
+普通卸载使用 `brew uninstall --cask mac-fantasy/tap/krill-desktop`，保留本机设置；加 `--zap` 会删除 `~/Library/Application Support/KrillDesktop` 中的偏好。钥匙串凭据不由该清理命令删除。若已手动安装同名应用，请先退出并移走旧 `.app` 后再安装。当前发行版未进行 Developer ID 签名和公证，首次打开可能需要按系统提示允许打开。
+
+项目已由 `lljxww/krill-desktop` 迁入 `mac-fantasy/krill-desktop`。`0.1.5` 起的客户端使用组织的新更新地址；旧版严格校验原仓库地址，可能无法识别迁移后的更新，需要通过 Homebrew 或 [Release](https://github.com/mac-fantasy/krill-desktop/releases/latest) 安装一次新版。账号凭据和设置继续保存在原有位置。
+
 ## 项目结构
 
 ```text
