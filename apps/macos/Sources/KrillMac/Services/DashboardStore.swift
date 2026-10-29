@@ -16,6 +16,7 @@ final class DashboardStore: ObservableObject {
     }
     @Published private(set) var profile: UserProfile?
     @Published private(set) var subscriptions: SubscriptionResponse?
+    @Published private(set) var subscriptionDate = Date()
     @Published private(set) var stats: RequestStats?
     @Published private(set) var announcements: [Announcement] = []
     @Published private(set) var isLoading = false
@@ -23,7 +24,7 @@ final class DashboardStore: ObservableObject {
     @Published private(set) var needsLogin = true
     @Published private(set) var isStale = false
     @Published private(set) var updatedAt: Date?
-    @Published private(set) var statusDetail = "使用网站现有的 GitHub 登录连接账号。"
+    @Published private(set) var statusDetail = "使用浏览器或官网任意登录方式连接账号。"
     @Published private(set) var statsNote = "打开面板后自动加载今日统计。"
     @Published private(set) var announcementNote = "连接后加载官网最新公告。"
     @Published var preferences: AppPreferences { didSet { savePreferences() } }
@@ -40,6 +41,7 @@ final class DashboardStore: ObservableObject {
     private var lastAnnouncements: Date?
     private var lastDetails: Date?
     private var lastAttempt: Date?
+    private var nextSubscriptionTransition: Date?
     private var pollingTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
@@ -56,9 +58,11 @@ final class DashboardStore: ObservableObject {
             } catch { statusDetail = "暂时无法读取钥匙串，解锁后重新连接账号。" }
         }
     }
-    var plans: [KrillCore.Subscription] { (subscriptions?.subscriptions ?? []).sorted { $0.consumePriority < $1.consumePriority } }
-    var activePlans: [KrillCore.Subscription] { plans.filter { $0.isActive() } }
-    var selectedPlan: KrillCore.Subscription? { activePlans.first { $0.id == preferences.selectedSubscriptionID } ?? activePlans.first }
+    var plans: [KrillCore.Subscription] { SubscriptionSelection.ordered(subscriptions?.subscriptions ?? []) }
+    var activePlans: [KrillCore.Subscription] { plans.filter { $0.availability(at: subscriptionDate) == .available } }
+    var selectedPlan: KrillCore.Subscription? {
+        SubscriptionSelection.select(plans, preferredID: preferences.selectedSubscriptionID, at: subscriptionDate)
+    }
     var quota: QuotaProjection? { selectedPlan.map(QuotaProjection.init) }
     var percent: Double? { quota?.percent }
     var hasData: Bool { subscriptions != nil }
@@ -83,6 +87,7 @@ final class DashboardStore: ObservableObject {
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 guard let self else { return }
+                self.advanceSubscriptionTime()
                 let interval = min(300, (self.isPanelVisible ? min(30, self.preferences.refreshSeconds) : self.preferences.refreshSeconds) * (1 << min(self.failures, 3)))
                 if self.lastAttempt.map({ Date().timeIntervalSince($0) >= Double(interval) }) ?? true {
                     self.requestRefresh()
@@ -117,7 +122,7 @@ final class DashboardStore: ObservableObject {
             let response = try await api.subscriptions(token: token)
             try Task.checkCancellation()
             guard current == generation else { return }
-            profile = account; subscriptions = response; updatedAt = Date()
+            profile = account; applySubscriptions(response); updatedAt = Date()
             needsLogin = false; isStale = false; failures = 0; statusDetail = "账号数据已同步，后台会自动更新。"
             if isPanelVisible && (lastDetails.map { Date().timeIntervalSince($0) >= 30 } ?? true) {
                 do {
@@ -149,7 +154,23 @@ final class DashboardStore: ObservableObject {
         }
     }
     func loginRequested() { openLogin?() }
-    // Called only after an exact-origin browser extraction; verify the credential before persisting it.
+    func applySubscriptions(_ response: SubscriptionResponse, at now: Date = Date()) {
+        let wasMonthly = selectedPlan?.isMonthly ?? false
+        subscriptions = response
+        reconcileSelection(at: now, preferredWasMonthly: wasMonthly)
+    }
+    func advanceSubscriptionTime(at now: Date = Date()) {
+        guard let nextSubscriptionTransition, now >= nextSubscriptionTransition else { return }
+        reconcileSelection(at: now, preferredWasMonthly: selectedPlan?.isMonthly ?? false)
+    }
+    private func reconcileSelection(at now: Date, preferredWasMonthly: Bool) {
+        subscriptionDate = now
+        let selected = SubscriptionSelection.select(plans, preferredID: preferences.selectedSubscriptionID,
+                                                     preferredWasMonthly: preferredWasMonthly, at: now)
+        if preferences.selectedSubscriptionID != selected?.id { preferences.selectedSubscriptionID = selected?.id }
+        nextSubscriptionTransition = SubscriptionSelection.nextTransition(in: plans, after: now)
+    }
+    // Browser extraction and explicit user imports both require API verification before persistence.
     func acceptSession(_ candidate: String) async throws {
         guard !demoOnly else { throw APIFailure.forbidden }
         let current = generation
@@ -166,7 +187,7 @@ final class DashboardStore: ObservableObject {
     }
     func useDemo() {
         resetSession(); token = nil; isDemo = true; needsLogin = false; isStale = false
-        profile = DemoData.profile; subscriptions = DemoData.subscriptions(); stats = DemoData.stats()
+        profile = DemoData.profile; applySubscriptions(DemoData.subscriptions()); stats = DemoData.stats()
         announcements = DemoData.announcements(); updatedAt = Date(); statusDetail = "虚构样例，不代表真实账号。"
         statsNote = "今日 · 演示数据"; announcementNote = "虚构演示公告"
     }
@@ -174,9 +195,9 @@ final class DashboardStore: ObservableObject {
         generation += 1; refreshTask?.cancel(); refreshTask = nil; isLoading = false; failures = 0; lastAnnouncements = nil; lastDetails = nil
     }
     private func clearView() {
-        profile = nil; subscriptions = nil; stats = nil; announcements = []; updatedAt = nil
+        profile = nil; subscriptions = nil; nextSubscriptionTransition = nil; stats = nil; announcements = []; updatedAt = nil
         isDemo = false; needsLogin = true; isStale = false; tab = .overview
-        statusDetail = "使用网站现有的 GitHub 登录连接账号。"; statsNote = "连接账号后加载今日统计。"
+        statusDetail = "使用浏览器或官网任意登录方式连接账号。"; statsNote = "连接账号后加载今日统计。"
     }
     private func savePreferences() {
         do { try storage.savePreferences(preferences) } catch { statusDetail = "本次设置暂时无法保存，请检查应用数据目录。" }

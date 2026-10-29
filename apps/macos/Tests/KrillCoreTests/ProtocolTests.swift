@@ -60,8 +60,23 @@ final class ProtocolTests: XCTestCase {
         for text in ["http://www.krill-code.com/app", "https://www.krill-code.com.evil.example", "https://krill-code.com", "https://www.krill-code.com:444", "https://user@www.krill-code.com"] {
             XCTAssertFalse(KrillOrigin.isTrusted(URL(string: text)), text)
         }
-        XCTAssertTrue(KrillOrigin.allowsLoginNavigation(URL(string: "https://github.com/login")))
-        XCTAssertFalse(KrillOrigin.allowsLoginNavigation(URL(string: "https://api.github.com")))
+        for text in ["https://github.com/login", "https://appleid.apple.com/auth/authorize", "https://accounts.google.com", "https://connect.linux.do/oauth2/authorize", "https://sso.example.org/login"] {
+            XCTAssertTrue(KrillOrigin.allowsLoginNavigation(URL(string: text)), text)
+            XCTAssertFalse(KrillOrigin.isTrusted(URL(string: text)), text)
+        }
+        for text in ["http://github.com", "javascript:alert(1)", "file:///tmp/login.html", "https://user:password@github.com", "https://github.com:444", "about:blank"] {
+            XCTAssertFalse(KrillOrigin.allowsLoginNavigation(URL(string: text)), text)
+        }
+        XCTAssertFalse(KrillOrigin.allowsLoginNavigation(nil))
+    }
+    func testBrowserSessionImportRejectsURLsScriptsAndHeaderInjection() {
+        let token = "syntheticxx.payloadxx.signaturexx"
+        XCTAssertEqual(BrowserLogin.session(from: " \n" + token + "\r\n"), token)
+        XCTAssertEqual(BrowserLogin.session(from: "Bearer " + token), token)
+        for text in ["", "null", "undefined", "\"" + token + "\"", "https://www.krill-code.com/#token=" + token,
+                     token + "\r\nX-Test: injected", BrowserLogin.exportScript, String(repeating: "a", count: 16401)] {
+            XCTAssertNil(BrowserLogin.session(from: text))
+        }
     }
     func testSessionShapeAndRequestCredentials() throws {
         let token = "samplexx.payloadxx.signaturexx"

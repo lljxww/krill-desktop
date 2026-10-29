@@ -87,7 +87,7 @@ struct DashboardView: View {
         }.frame(maxWidth: .infinity).padding(.vertical, 30)
     }
     private var connectButton: some View {
-        Button("使用 GitHub 连接") { store.loginRequested() }
+        Button("连接 Krill 账号") { store.loginRequested() }
             .buttonStyle(.borderedProminent).controlSize(.large).disabled(store.isDemoOnly)
     }
     private var overview: some View {
@@ -151,29 +151,32 @@ struct DashboardView: View {
     }
     private func planCard(_ plan: Subscription) -> some View {
         let quota = QuotaProjection(plan)
+        let state = plan.availability(at: store.subscriptionDate)
+        let available = state == .available
+        let accent = available ? KrillTheme.mint : KrillTheme.muted
         return Card {
             HStack(alignment: .top) {
                 Text(plan.plan.name).fontWeight(.semibold)
                 Spacer()
-                Text(plan.isActive() ? "使用中" : plan.status == "frozen" ? "已冻结" : "已结束 / 不可用")
-                    .font(.system(size: 10)).foregroundStyle(KrillTheme.mint).padding(.horizontal, 8).padding(.vertical, 5)
-                    .background(KrillTheme.mint.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
+                Text(state.label)
+                    .font(.system(size: 10)).foregroundStyle(accent).padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
             }
             Text(quota.cycle).font(.system(size: 11)).foregroundStyle(KrillTheme.muted)
             HStack {
-                Text(quota.amount(quota.remaining)).font(.system(size: 28, weight: .semibold, design: .rounded)).foregroundStyle(KrillTheme.mint).monospacedDigit()
+                Text(quota.amount(quota.remaining)).font(.system(size: 28, weight: .semibold, design: .rounded)).foregroundStyle(accent).monospacedDigit()
                 Spacer(); Text("上限 \(quota.amount(quota.limit))").font(.system(size: 11)).foregroundStyle(KrillTheme.muted)
             }
-            ProgressView(value: quota.percent ?? 0, total: 100).tint(KrillTheme.mint)
+            ProgressView(value: quota.percent ?? 0, total: 100).tint(accent)
                 .accessibilityLabel("剩余额度").accessibilityValue(quota.percent.map { String(format: "%.0f%%", $0) } ?? "未知")
             Text("已用 \(quota.amount(quota.used))").font(.system(size: 11)).foregroundStyle(KrillTheme.muted)
-            if let forwarded = quota.forwarded, forwarded > 0 { Text("另有结转 \(DisplayFormat.money(forwarded))").font(.system(size: 11)).foregroundStyle(KrillTheme.mint) }
+            if let forwarded = quota.forwarded, forwarded > 0 { Text("另有结转 \(DisplayFormat.money(forwarded))").font(.system(size: 11)).foregroundStyle(accent) }
             Divider()
             HStack {
                 Text(quota.resetAt.map { "\(DisplayFormat.date($0)) 重置" } ?? "周期时间以官网为准")
                 Spacer(); Text("\(DisplayFormat.date(plan.subscriptionEndAt)) 到期")
             }.font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
-        }
+        }.saturation(available ? 1 : 0).opacity(available ? 1 : 0.55)
     }
     private var usage: some View {
         VStack(alignment: .leading, spacing: 16) {

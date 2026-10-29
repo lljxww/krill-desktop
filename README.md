@@ -5,7 +5,7 @@ Krill 个人账号用量助手，提供 Windows 与 macOS 两套原生客户端�
 - **Windows**：C# / .NET 10 / WPF，桌面悬浮球，支持贴边收成进度竖条，点击展开详情。
 - **macOS**：Swift 6 / AppKit / SwiftUI，菜单栏磷虾 Logo 与额度进度环，点击展开详情面板。macOS 14 起运行；macOS 26 上可为导航与工具按钮使用 Liquid Glass。
 
-两端均显示个人资料、套餐周期剩余、充值余额、福利余额、结转额度、今日统计和公告，使用网站现有 GitHub 登录，并可跳转官网管理账号。详情面板沿用相同的五个页签与深色薄荷绿配色。
+两端均显示个人资料、套餐周期剩余、充值余额、福利余额、结转额度、今日统计和公告，支持官网现有的任意登录方式（包括 Apple → GitHub 等二次登录），并可跳转官网管理账号。月卡额度用尽或到期后自动切换其他生效月卡，并将不可用卡片置灰。详情面板沿用相同的五个页签与深色薄荷绿配色。
 
 macOS 已在 Apple Silicon / Apple Swift 6.4 环境通过测试、Release 编译和 ad-hoc 签名检查。应用使用 AppKit 生命周期，启动仅常驻菜单栏；详情面板使用 SwiftUI。真实账号登录、旧版 macOS 与 Intel 架构仍需验收，具体边界见 [macOS 开发文档](docs/macos.md)。
 
@@ -39,7 +39,7 @@ apps/
     Sources/KrillCore/         Swift 协议客户端、模型、额度与展示规则
     Sources/KrillMac/
       App/                    应用入口、菜单栏图标与弹出面板
-      Services/               状态管理、钥匙串、WKWebView 登录
+      Services/               状态管理、钥匙串、浏览器 / WKWebView 登录
       Views/                  SwiftUI 五页详情面板与主题
     Tests/KrillCoreTests/      Swift 契约测试
     Tests/KrillMacTests/       菜单栏图标与 WebKit 回调回归测试
@@ -90,10 +90,10 @@ swift run --package-path apps/macos KrillMac --demo
 
 ## 数据与验证边界
 
-凭据只保存在本机：Windows 使用当前用户 DPAPI，macOS 使用钥匙串。两端登录窗口都使用独立临时浏览会话，仅在精确的 `https://www.krill-code.com` 来源读取 Krill 会话，再调用 `/api/auth/me` 校验。接口请求不会自动跟随重定向；公告只显示原生文本摘要。
+凭据只保存在本机：Windows 使用当前用户 DPAPI，macOS 使用钥匙串。两端默认提供系统浏览器登录，可复用已有 Krill / 第三方登录状态；官网目前没有桌面授权回传接口，因此登录后需按窗口指引手动导入一次会话。也可选择应用内临时浏览会话，支持第三方 HTTPS 跳转和共享会话的授权弹窗。自动读取只在精确的 `https://www.krill-code.com` 来源进行；自动读取和手动导入均调用 `/api/auth/me` 校验后才保存。接口请求不会自动跟随重定向；公告只显示原生文本摘要。
 
 `--demo` 使用虚构数据和独立配置目录。`record.har` 仅作为本地协议参考，已忽略，不参与构建或打包。请不要将个人 HAR、会话、授权码或 token 提交到仓库。
 
 两端在账号模式启动后自动检查 GitHub 最新正式 Release，之后每 6 小时检查一次；也可在设置页或菜单中手动检查，发现新版后点击“下载并重启更新”。推送 `vX.Y.Z` tag 会自动测试、构建并发布对应版本的 Windows x64 与 macOS 通用包，操作与运行限制见 [版本发布与应用更新](docs/releases.md)。
 
-两端的验证结果与尚待完成的验收分别记录在平台文档中。接口来自官网当前实现，协议变化时需要同步更新两端客户端与共用样例。跨设备会话同步尚未实现。
+两端的验证结果与尚待完成的验收分别记录在平台文档中。接口来自官网当前实现，协议变化时需要同步更新两端客户端与共用样例。浏览器登录不会自动同步会话，跨设备会话同步尚未实现。

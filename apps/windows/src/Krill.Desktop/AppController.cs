@@ -202,12 +202,18 @@ public sealed class AppController : IDisposable
     {
         try
         {
+            var lastRefresh = DateTimeOffset.UtcNow;
             while (!ct.IsCancellationRequested)
             {
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+                ViewModel.AdvanceSubscriptionTime();
                 var seconds = Panel.IsVisible ? Math.Min(ViewModel.RefreshSeconds, 30) : ViewModel.RefreshSeconds;
                 seconds = Math.Min(300, seconds * (1 << Math.Min(_failures, 3)));
-                await Task.Delay(TimeSpan.FromSeconds(seconds), ct);
-                if (_token is not null && !ViewModel.IsDemo) await RefreshAsync(Panel.IsVisible);
+                if (DateTimeOffset.UtcNow - lastRefresh >= TimeSpan.FromSeconds(seconds))
+                {
+                    lastRefresh = DateTimeOffset.UtcNow;
+                    if (_token is not null && !ViewModel.IsDemo) await RefreshAsync(Panel.IsVisible);
+                }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }

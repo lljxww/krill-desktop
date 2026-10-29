@@ -61,7 +61,7 @@
                         </Grid>
                         <TextBlock Text="用量与余额，&#10;一眼就知道。" FontSize="32" FontWeight="SemiBold" LineHeight="45" />
                         <TextBlock Text="把 Krill 放在桌面一角。&#10;套餐剩余、账户余额和最新公告，随手可见。" Foreground="{StaticResource MutedBrush}" FontSize="13" LineHeight="23" Margin="0,16,0,26" />
-                        <Button Content="使用 GitHub 连接" Style="{StaticResource AccentButton}" Height="44" Command="{Binding LoginCommand}" AutomationProperties.Name="使用 GitHub 连接" />
+                        <Button Content="连接 Krill 账号" Style="{StaticResource AccentButton}" Height="44" Command="{Binding LoginCommand}" AutomationProperties.Name="连接 Krill 账号" />
                         <Button Content="先看演示  →" Style="{StaticResource GhostButton}" Command="{Binding ShowDemoCommand}" Margin="0,8,0,14" />
                         <TextBlock Text="登录会话在本机加密保存" HorizontalAlignment="Center" Foreground="{StaticResource SubtleBrush}" FontSize="11" />
                     </StackPanel>
@@ -122,15 +122,15 @@
                             <TextBlock Text="悬浮球显示的套餐" Style="{StaticResource SectionLabel}" Margin="0,0,0,8" />
                             <ComboBox ItemsSource="{Binding SelectablePlans}" SelectedItem="{Binding SelectedPlan}" DisplayMemberPath="Name" Margin="0,0,0,18" AutomationProperties.Name="悬浮球显示的套餐" />
                             <ItemsControl ItemsSource="{Binding Plans}"><ItemsControl.ItemTemplate><DataTemplate>
-                                <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Opacity="{Binding Opacity}">
                                     <StackPanel>
                                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,12,0" />
-                                            <Border Grid.Column="1" Background="#213B39" CornerRadius="6" Padding="8,4" VerticalAlignment="Top"><TextBlock Text="{Binding State}" FontSize="10" Foreground="#9CD6C7" /></Border>
+                                            <Border Grid.Column="1" Background="#213B39" CornerRadius="6" Padding="8,4" VerticalAlignment="Top"><TextBlock Text="{Binding State}" FontSize="10" Foreground="{Binding Accent}" /></Border>
                                         </Grid>
                                         <TextBlock Text="{Binding Cycle}" Style="{StaticResource Muted}" Margin="0,15,0,5" />
-                                        <DockPanel><TextBlock Text="{Binding Limit, StringFormat=上限 {0}}" DockPanel.Dock="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="11" /><TextBlock Text="{Binding Remaining}" FontSize="26" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" /></DockPanel>
-                                        <ProgressBar Style="{StaticResource QuotaBar}" Value="{Binding Percent, Mode=OneWay}" Margin="0,12,0,12" />
+                                        <DockPanel><TextBlock Text="{Binding Limit, StringFormat=上限 {0}}" DockPanel.Dock="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="11" /><TextBlock Text="{Binding Remaining}" FontSize="26" FontWeight="SemiBold" Foreground="{Binding Accent}" /></DockPanel>
+                                        <ProgressBar Style="{StaticResource QuotaBar}" Foreground="{Binding Accent}" Value="{Binding Percent, Mode=OneWay}" Margin="0,12,0,12" />
                                         <TextBlock Text="{Binding Used, StringFormat=已用 {0}}" Style="{StaticResource Muted}" />
                                         <TextBlock Text="{Binding Forwarded, StringFormat=另有结转 {0}}" Foreground="#A9C7D6" FontSize="11" Margin="0,5,0,0" Visibility="{Binding HasForwarded, Converter={StaticResource BoolVisibility}}" />
                                         <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,11" />

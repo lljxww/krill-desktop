@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
+using Krill.Core;
 
 namespace Krill.Desktop.Services;
 
@@ -63,10 +64,45 @@ internal static class UiVerifier
         if (app.ViewModel.PrimaryRemaining != "$16.80" || app.ViewModel.OrbText != "84%") throw new InvalidOperationException("Plan selection did not update the orb.");
         app.ViewModel.SelectedPlan = app.ViewModel.SelectablePlans.Single(p => p.Id == 1);
         checks.Add("plan_selection_updates_orb");
+        var rolloverTime = DateTimeOffset.UtcNow;
+        var exhausted = new Subscription { SubscriptionId = 301, Status = "active", ConsumePriority = 1,
+            Plan = new Plan { Name = "Synthetic exhausted month", BillingType = "usd_monthly" },
+            Quota = new Quota { DailyLimitUsd = 100, RemainingUsd = 0 } };
+        var monthly = new Subscription { SubscriptionId = 302, Status = "active", ConsumePriority = 10,
+            SubscriptionEndAt = rolloverTime.AddSeconds(10),
+            Plan = new Plan { Name = "Synthetic usable month", BillingType = "usd_monthly" },
+            Quota = new Quota { DailyLimitUsd = 100, RemainingUsd = 80 } };
+        var upcoming = new Subscription { SubscriptionId = 303, Status = "active", ConsumePriority = 2,
+            SubscriptionStartAt = rolloverTime.AddSeconds(10),
+            Plan = new Plan { Name = "Synthetic upcoming month", BillingType = "usd_monthly" },
+            Quota = new Quota { DailyLimitUsd = 100, RemainingUsd = 100 } };
+        var dailyPlan = new Subscription { SubscriptionId = 304, Status = "active", ConsumePriority = 0,
+            Plan = new Plan { Name = "Synthetic daily card", BillingType = "usd_daily" },
+            Quota = new Quota { DailyLimitUsd = 20, RemainingUsd = 10 } };
+        var monthlyResponse = new SubscriptionResponse { Subscriptions = [exhausted, monthly, upcoming, dailyPlan] };
+        // First display the card while usable, then observe its exhaustion on the next response.
+        exhausted.Quota.RemainingUsd = 10;
+        app.ViewModel.ApplyCore(DemoData.Profile, new SubscriptionResponse { Subscriptions = [exhausted] }, demo: true, now: rolloverTime);
+        exhausted.Quota.RemainingUsd = 0;
+        app.ViewModel.ApplyCore(DemoData.Profile, monthlyResponse, demo: true, now: rolloverTime);
+        if (app.ViewModel.SelectedPlan?.Id != 302 || storage.LoadSettings().SelectedSubscriptionId != 302 || app.ViewModel.OrbText != "80%")
+            throw new InvalidOperationException("Monthly exhaustion did not persist a usable monthly selection.");
+        if (app.ViewModel.Plans.Single(p => p.Id == 301) is not { State: "额度已用尽", IsActive: false, Opacity: < 1 })
+            throw new InvalidOperationException("Exhausted card was not muted.");
+        app.ViewModel.SelectedTab = 1;
+        await app.Panel.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        Capture(app.Panel, Path.Combine(output, "monthly-rollover.png"));
+        checks.Add("monthly_exhaustion_switches_and_persists");
+        app.ViewModel.AdvanceSubscriptionTime(rolloverTime.AddSeconds(10));
+        if (app.ViewModel.SelectedPlan?.Id != 303 || storage.LoadSettings().SelectedSubscriptionId != 303 ||
+            app.ViewModel.Plans.Single(p => p.Id == 302).State != "已到期")
+            throw new InvalidOperationException("Monthly expiry did not switch to the newly effective card.");
+        checks.Add("monthly_expiry_switches_without_network");
+        app.UseDemo();
         if (!Views.LoginWindow.IsAllowedNavigation("https://github.com/login/oauth/authorize?state=synthetic") ||
-            Views.LoginWindow.IsAllowedNavigation("https://github.com.evil.example/login") ||
+            !Views.LoginWindow.IsAllowedNavigation("https://appleid.apple.com/auth/authorize") ||
             Views.LoginWindow.IsAllowedNavigation("http://www.krill-code.com/login")) throw new InvalidOperationException("Login navigation policy mismatch.");
-        checks.Add("login_navigation_origin_restriction");
+        checks.Add("login_https_navigation");
         app.ViewModel.SelectedTab = 0;
         var previousAmount = app.ViewModel.PrimaryRemaining;
         app.ViewModel.ReportFailure("连接暂时中断，以下为上次成功读取的数据。");

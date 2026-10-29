@@ -10,8 +10,11 @@ namespace Krill.Desktop.ViewModels;
 public sealed record DashboardActions(Func<Task> Login, Func<Task> Refresh, Action<string> OpenWebsite,
     Action SignOut, Action Exit, Action PreferencesChanged, Action<long> MarkAnnouncementRead, Action ShowDemo);
 
-public sealed record SubscriptionCard(Subscription Source, QuotaProjection Quota, bool IsActive)
+public sealed record SubscriptionCard(Subscription Source, QuotaProjection Quota, SubscriptionAvailability Availability)
 {
+    public bool IsActive => Availability == SubscriptionAvailability.Available;
+    public double Opacity => IsActive ? 1 : 0.55;
+    public string Accent => IsActive ? "#7CE3CD" : "#91A6B2";
     public long Id => Source.SubscriptionId;
     public string Name => Source.Plan.Name;
     public string Cycle => Quota.Cycle;
@@ -21,7 +24,7 @@ public sealed record SubscriptionCard(Subscription Source, QuotaProjection Quota
     public string Forwarded => DisplayFormat.Money(Quota.Forwarded);
     public string Reset => Quota.ResetAt.HasValue ? $"{DisplayFormat.LocalDate(Quota.ResetAt)} 重置" : "周期时间以官网为准";
     public string Expiry => $"{DisplayFormat.LocalDate(Source.SubscriptionEndAt)} 到期";
-    public string State => IsActive ? "使用中" : Source.Status == "frozen" ? "已冻结" : "已结束 / 不可用";
+    public string State => SubscriptionSelection.Label(Availability);
     public double Percent => Quota.Percent ?? 0;
     public bool HasForwarded => Quota.Forwarded > 0;
 }
@@ -36,6 +39,7 @@ public partial class DashboardViewModel : ObservableObject
     private readonly ClientSettings _settings;
     private bool _applying;
     private SubscriptionResponse? _subscriptions;
+    private DateTimeOffset? _nextSubscriptionTransition;
     private RequestStats? _stats;
 
     public DashboardViewModel(ClientSettings settings, DashboardActions actions)
@@ -80,7 +84,7 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty] private string userEmail = "连接账号，随时掌握剩余额度";
     [ObservableProperty] private string avatarText = "K";
     [ObservableProperty] private string statusTitle = "尚未连接";
-    [ObservableProperty] private string statusDetail = "使用网站现有的 GitHub 登录连接账号。";
+    [ObservableProperty] private string statusDetail = "使用浏览器或官网任意登录方式连接账号。";
     [ObservableProperty] private string lastUpdatedText = "等待首次同步";
     [ObservableProperty] private string creditText = "—";
     [ObservableProperty] private string welfareText = "—";
@@ -133,31 +137,51 @@ public partial class DashboardViewModel : ObservableObject
     partial void OnIsStaleChanged(bool value) => ProjectQuota();
     partial void OnNeedsLoginChanged(bool value) => ProjectQuota();
 
-    public void ApplyCore(UserProfile profile, SubscriptionResponse response, bool demo = false)
+    public void ApplyCore(UserProfile profile, SubscriptionResponse response, bool demo = false, DateTimeOffset? now = null)
     {
         IsDemo = demo; NeedsLogin = false; IsStale = false; HasData = true;
         UserName = profile.FriendlyName;
         UserEmail = profile.Email ?? "已连接 Krill 账号";
         AvatarText = string.IsNullOrEmpty(UserName) ? "K" : StringInfo.GetNextTextElement(UserName).ToUpperInvariant();
-        _subscriptions = response;
         CreditText = DisplayFormat.Money(response.CreditBalanceUsd);
         WelfareText = DisplayFormat.Money(response.WelfareBalanceUsd);
-        _applying = true;
-        var chosen = SelectedPlan?.Id ?? _settings.SelectedSubscriptionId;
-        Plans.Clear(); SelectablePlans.Clear();
-        foreach (var subscription in (response.Subscriptions ?? []).OrderBy(x => x.ConsumePriority))
-        {
-            var active = subscription.Status == "active" && (subscription.SubscriptionEndAt is null || subscription.SubscriptionEndAt > DateTimeOffset.UtcNow);
-            var card = new SubscriptionCard(subscription, QuotaProjection.From(subscription), active);
-            Plans.Add(card); if (active) SelectablePlans.Add(card);
-        }
-        SelectedPlan = SelectablePlans.FirstOrDefault(x => x.Id == chosen) ?? SelectablePlans.FirstOrDefault();
-        _applying = false;
-        PlanCountText = $"{SelectablePlans.Count} 个有效套餐";
+        ApplySubscriptions(response, now ?? DateTimeOffset.UtcNow);
         LastUpdatedText = $"更新于 {DateTime.Now:HH:mm:ss}";
         StatusTitle = demo ? "演示模式" : "已连接";
         StatusDetail = demo ? "以下为虚构样例数据，不代表真实账号。" : "账号数据已同步，后台会自动更新。";
         ProjectQuota();
+    }
+
+    private void ApplySubscriptions(SubscriptionResponse response, DateTimeOffset now)
+    {
+        var previous = SelectedPlan?.Source;
+        var chosen = SelectedPlan?.Id ?? _settings.SelectedSubscriptionId;
+        var selected = SubscriptionSelection.Select(response.Subscriptions, chosen, now,
+            previous is not null && SubscriptionSelection.IsMonthly(previous));
+        _subscriptions = response;
+        _applying = true;
+        Plans.Clear(); SelectablePlans.Clear();
+        foreach (var subscription in SubscriptionSelection.Ordered(response.Subscriptions))
+        {
+            var card = new SubscriptionCard(subscription, QuotaProjection.From(subscription), SubscriptionSelection.Availability(subscription, now));
+            Plans.Add(card); if (card.IsActive) SelectablePlans.Add(card);
+        }
+        SelectedPlan = SelectablePlans.FirstOrDefault(x => x.Id == selected?.SubscriptionId);
+        _applying = false;
+        if (_settings.SelectedSubscriptionId != SelectedPlan?.Id)
+        {
+            _settings.SelectedSubscriptionId = SelectedPlan?.Id;
+            _actions.PreferencesChanged();
+        }
+        _nextSubscriptionTransition = SubscriptionSelection.NextTransition(response.Subscriptions, now);
+        PlanCountText = $"{SelectablePlans.Count} 个有效套餐";
+        ProjectQuota();
+    }
+
+    public void AdvanceSubscriptionTime(DateTimeOffset? now = null)
+    {
+        var time = now ?? DateTimeOffset.UtcNow;
+        if (_subscriptions is not null && _nextSubscriptionTransition <= time) ApplySubscriptions(_subscriptions, time);
     }
 
     private void ProjectQuota()
@@ -230,12 +254,12 @@ public partial class DashboardViewModel : ObservableObject
     {
         _subscriptions = null; _stats = null; HasData = false; HasStats = false; IsDemo = false;
         NeedsLogin = true; IsStale = false; IsLoading = false;
-        Plans.Clear(); SelectablePlans.Clear(); SelectedPlan = null;
+        Plans.Clear(); SelectablePlans.Clear(); SelectedPlan = null; _nextSubscriptionTransition = null;
         ChartBars.Clear(); Announcements.Clear(); RecentAnnouncements.Clear();
         UserName = "你的桌面用量助手"; UserEmail = "连接账号，随时掌握剩余额度"; AvatarText = "K";
         CreditText = WelfareText = RequestsText = TokensText = CostText = SuccessRateText = InputTokensText = OutputTokensText = "—";
         LastUpdatedText = "等待首次同步"; StatusTitle = "尚未连接";
-        StatusDetail = "使用网站现有的 GitHub 登录连接账号。";
+        StatusDetail = "使用浏览器或官网任意登录方式连接账号。";
         StatsNote = "连接账号后加载今日统计。"; SelectedTab = 0; ProjectQuota();
     }
 }

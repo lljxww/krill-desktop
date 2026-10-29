@@ -28,8 +28,10 @@ public enum KrillOrigin {
     }
     public static func allowsLoginNavigation(_ url: URL?) -> Bool {
         guard let url else { return false }
-        return isTrusted(url) || (url.scheme?.lowercased() == "https" && url.host?.lowercased() == "github.com"
-            && (url.port == nil || url.port == 443) && url.user == nil && url.password == nil)
+        // Identity providers can delegate to another provider (for example GitHub to Apple).
+        // Navigation is broader than the exact origin allowed to supply a Krill credential.
+        return url.scheme?.lowercased() == "https" && url.host?.isEmpty == false
+            && (url.port == nil || url.port == 443) && url.user == nil && url.password == nil
     }
     public static func isPlausibleSession(_ token: String) -> Bool {
         (16...16384).contains(token.utf8.count) && token.range(of: #"\A[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\z"#, options: .regularExpression) != nil

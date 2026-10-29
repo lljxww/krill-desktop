@@ -6,6 +6,69 @@ using Krill.Core;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("Monthly rollover skips exhausted, expired and upcoming cards and prefers another month", () => Sync(() =>
+    {
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "subscription-selection.json"));
+        var plans = JsonSerializer.Deserialize<ApiEnvelope<SubscriptionResponse>>(json, KrillJson.Options)!.Data!.Subscriptions;
+        using var fixture = JsonDocument.Parse(json);
+        var now = fixture.RootElement.GetProperty("evaluation_time").GetDateTimeOffset();
+        Equal(205L, SubscriptionSelection.Select(plans, 201, now)!.SubscriptionId);
+        Equal(205L, SubscriptionSelection.Select(plans, 203, now)!.SubscriptionId);
+        Equal(205L, SubscriptionSelection.Select(plans.AsEnumerable().Reverse(), 201, now)!.SubscriptionId);
+        Equal(100L, SubscriptionSelection.Select(plans, 100, now)!.SubscriptionId);
+        Equal(206L, SubscriptionSelection.Select(plans, 206, now)!.SubscriptionId);
+        Equal(100L, SubscriptionSelection.Select(plans, null, now)!.SubscriptionId);
+        Equal(205L, SubscriptionSelection.Select(plans, 999, now, preferredWasMonthly: true)!.SubscriptionId);
+        Equal(now.AddSeconds(10), SubscriptionSelection.NextTransition(plans, now));
+        Equal(202L, SubscriptionSelection.Select(plans, 205, now.AddSeconds(10))!.SubscriptionId);
+    })),
+    ("Monthly availability preserves unknown quotas and usable carryover", () => Sync(() =>
+    {
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "subscription-selection.json"));
+        var plans = JsonSerializer.Deserialize<ApiEnvelope<SubscriptionResponse>>(json, KrillJson.Options)!.Data!.Subscriptions;
+        using var fixture = JsonDocument.Parse(json);
+        var now = fixture.RootElement.GetProperty("evaluation_time").GetDateTimeOffset();
+        var expected = new Dictionary<long, SubscriptionAvailability>
+        {
+            [100] = SubscriptionAvailability.Available, [201] = SubscriptionAvailability.Exhausted,
+            [202] = SubscriptionAvailability.NotStarted, [203] = SubscriptionAvailability.Expired,
+            [204] = SubscriptionAvailability.Frozen, [205] = SubscriptionAvailability.Available,
+            [206] = SubscriptionAvailability.Available, [207] = SubscriptionAvailability.Exhausted,
+            [208] = SubscriptionAvailability.Available, [209] = SubscriptionAvailability.Available,
+            [210] = SubscriptionAvailability.Exhausted
+        };
+        foreach (var plan in plans) Equal(expected[plan.SubscriptionId], SubscriptionSelection.Availability(plan, now));
+        foreach (var id in new long[] { 208, 209 }) Equal(id, SubscriptionSelection.Select(plans, id, now)!.SubscriptionId);
+        var unavailable = plans.Where(x => new long[] { 201, 202, 203, 204, 207, 210 }.Contains(x.SubscriptionId)).ToArray();
+        Equal(null, SubscriptionSelection.Select(unavailable, 201, now));
+        Equal(100L, SubscriptionSelection.Select(unavailable.Append(plans[0]), 201, now)!.SubscriptionId);
+        plans[0].Quota.RemainingUsd = 0;
+        Equal(SubscriptionAvailability.Available, SubscriptionSelection.Availability(plans[0], now));
+        plans[0].Plan.DurationDays = 30;
+        Equal(SubscriptionAvailability.Exhausted, SubscriptionSelection.Availability(plans[0], now));
+    })),
+    ("Login supports chained HTTPS providers but only trusts Krill for credentials", () => Sync(() =>
+    {
+        foreach (var value in new[] { "https://github.com/login", "https://appleid.apple.com/auth/authorize",
+            "https://accounts.google.com", "https://connect.linux.do/oauth2/authorize", "https://sso.example.org/login" })
+        {
+            Equal(true, BrowserLogin.AllowsNavigation(value));
+            Equal(false, KrillApiClient.IsTrustedPage(new Uri(value)));
+        }
+        foreach (var value in new[] { "http://github.com", "javascript:alert(1)", "file:///tmp/login.html",
+            "https://user:password@github.com", "https://github.com:444", "about:blank", "" })
+            Equal(false, BrowserLogin.AllowsNavigation(value));
+        Equal(false, KrillApiClient.IsTrustedPage(new Uri("https://www.krill-code.com.evil.example")));
+    })),
+    ("Browser session import rejects URLs, scripts and header injection", () => Sync(() =>
+    {
+        const string token = "syntheticxx.payloadxx.signaturexx";
+        Equal(token, BrowserLogin.SessionFromText(" \n" + token + "\r\n"));
+        Equal(token, BrowserLogin.SessionFromText("Bearer " + token));
+        foreach (var value in new[] { "", "null", "undefined", "\"" + token + "\"", "https://www.krill-code.com/#token=" + token,
+            token + "\r\nX-Test: injected", BrowserLogin.ExportScript, new string('a', 16401) })
+            Equal(null, BrowserLogin.SessionFromText(value));
+    })),
     ("Release versions compare numerically and reject unsupported tags", () => Sync(() =>
     {
         Equal(true, ReleaseVersion.Parse("v1.10.2")!.CompareTo(ReleaseVersion.Parse("1.9.99")) > 0);

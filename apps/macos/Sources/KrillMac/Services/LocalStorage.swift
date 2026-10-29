@@ -27,8 +27,8 @@ struct AppPreferences: Codable {
 final class LocalStorage {
     private let settingsURL: URL
     private let keychainService: String
-    init(demo: Bool) throws {
-        let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+    init(demo: Bool, directory: URL? = nil) throws {
+        let root = try directory ?? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("KrillDesktop", isDirectory: true).appendingPathComponent(demo ? "Demo" : "Account", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         settingsURL = root.appendingPathComponent("settings.json")

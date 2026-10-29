@@ -78,23 +78,27 @@ public struct Subscription: Decodable, Identifiable, Sendable {
     public var status: String?
     public var plan: Plan
     public var quota: Quota
+    public var subscriptionStartAt: Date?
     public var subscriptionEndAt: Date?
     public var consumePriority: Int64
     public var id: Int64 { subscriptionId }
-    public func isActive(at now: Date = Date()) -> Bool { status == "active" && (subscriptionEndAt.map { $0 > now } ?? true) }
-    enum CodingKeys: String, CodingKey { case subscriptionId, status, plan, quota, subscriptionEndAt, consumePriority }
+    public func isActive(at now: Date = Date()) -> Bool {
+        status == "active" && (subscriptionStartAt.map { $0 <= now } ?? true) && (subscriptionEndAt.map { $0 > now } ?? true)
+    }
+    enum CodingKeys: String, CodingKey { case subscriptionId, status, plan, quota, subscriptionStartAt, subscriptionEndAt, consumePriority }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         subscriptionId = try c.integer(.subscriptionId) ?? 0
         status = try c.decodeIfPresent(String.self, forKey: .status)
         plan = try c.decodeIfPresent(Plan.self, forKey: .plan) ?? Plan()
         quota = try c.decodeIfPresent(Quota.self, forKey: .quota) ?? Quota()
+        subscriptionStartAt = try c.decodeIfPresent(Date.self, forKey: .subscriptionStartAt)
         subscriptionEndAt = try c.decodeIfPresent(Date.self, forKey: .subscriptionEndAt)
         consumePriority = try c.integer(.consumePriority) ?? 0
     }
-    public init(id: Int64, status: String, plan: Plan, quota: Quota, end: Date?, priority: Int64) {
+    public init(id: Int64, status: String, plan: Plan, quota: Quota, end: Date?, priority: Int64, start: Date? = nil) {
         subscriptionId = id; self.status = status; self.plan = plan; self.quota = quota
-        subscriptionEndAt = end; consumePriority = priority
+        subscriptionStartAt = start; subscriptionEndAt = end; consumePriority = priority
     }
 }
 
@@ -102,15 +106,17 @@ public struct Plan: Decodable, Sendable {
     public var name = "Krill 套餐"
     public var billingType: String?
     public var totalCredits: Decimal?
-    enum CodingKeys: String, CodingKey { case name, billingType, totalCredits }
-    public init(name: String = "Krill 套餐", billingType: String? = nil, totalCredits: Decimal? = nil) {
-        self.name = name; self.billingType = billingType; self.totalCredits = totalCredits
+    public var durationDays: Int64?
+    enum CodingKeys: String, CodingKey { case name, billingType, totalCredits, durationDays }
+    public init(name: String = "Krill 套餐", billingType: String? = nil, totalCredits: Decimal? = nil, durationDays: Int64? = nil) {
+        self.name = name; self.billingType = billingType; self.totalCredits = totalCredits; self.durationDays = durationDays
     }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         name = try c.decodeIfPresent(String.self, forKey: .name) ?? "Krill 套餐"
         billingType = try c.decodeIfPresent(String.self, forKey: .billingType)
         totalCredits = try c.decimal(.totalCredits)
+        durationDays = try c.integer(.durationDays)
     }
 }
 

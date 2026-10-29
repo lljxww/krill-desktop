@@ -17,12 +17,14 @@ Windows 上可用 `uv run scripts/macos/check_source.py` 重跑 Swift / Bash 语
 | `Views/DashboardView.swift` | 概览、套餐、今日用量、公告、设置 |
 | `Views/Theme.swift` | 与 Windows 对齐的配色、卡片、额度环；局部玻璃效果 |
 | `Services/DashboardStore.swift` | 主线程状态、刷新、离线 / 失效处理、登录项 |
-| `Services/LoginWindowController.swift` | 临时 `WKWebView` 登录、来源校验与会话确认 |
+| `Services/LoginWindowController.swift` | 系统浏览器会话导入、临时 `WKWebView` 与授权弹窗、会话确认 |
 | `Services/LocalStorage.swift` | JSON 偏好、Keychain 会话 |
 | `Sources/KrillCore/` | Foundation 协议、模型、金额计算、演示样例 |
 | `Tests/KrillCoreTests/`、`Tests/KrillMacTests/` | 核心契约、菜单栏图标绘制与 WebKit 导航回调注册测试 |
 
 AppKit 负责应用事件循环、菜单栏、窗口壳、浏览器和系统存储；详情内容通过 `NSHostingController` 使用 SwiftUI。应用不注册 SwiftUI `App`、`Settings` 或 `WindowGroup` 场景，因此不会生成空白默认窗口；设置位于详情面板内。应用不显示 Dock 图标，关闭面板后继续常驻菜单栏。22 点菜单栏图标中心是与应用图标一致的单色几何磷虾 Logo，外圈从顶部顺时针表示所选套餐的剩余额度：100% 为完整圆环，0% 仅显示淡色底环；只有充值余额或额度未知时也只显示底环。图标用系统模板色适应明暗背景；鼠标悬停显示金额、套餐、连接状态和更新时间。设置中可在图标旁显示百分比 / 余额。未登录或会话失效时停止显示额度弧，右下角显示空心提示点；离线保留上次额度弧并显示实心提示点。
+
+月卡用尽或到期时会优先自动切换其他已生效、仍有可用额度的月卡，并持久保存新选择。不可用卡片保留在套餐列表中置灰，分别显示“已到期”“额度已用尽”“未生效”等状态，排除在选择器外。未知剩余额度不当作零，可用结转仍可使用；本地计时在已知生效 / 到期边界更新展示，额度消耗以接口刷新为准。
 
 详情面板宽约 500 点，高度按当前屏幕工作区限制，内容可滚动；保留 Windows 的五个页签、金额卡片、额度环、统计柱图和底部网站入口。支持固定面板、Esc 收起、手动刷新、选择套餐、公告未读与登录启动。Liquid Glass 仅用于导航与工具控件，金额信息使用深色卡片维持可读性。
 
@@ -79,14 +81,15 @@ KRILL_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 - 演示偏好：`~/Library/Application Support/KrillDesktop/Demo/settings.json`
 - 正常会话：Keychain 通用密码，service 为 `com.krill.desktop.macos.account`，account 为 `krill-session`。
 - 演示 CLI 模式使用单独 Keychain service，且不会读取或保存真实登录会话。
-- 登录 WKWebView 为非持久会话，关闭后不保留可复用的 GitHub 浏览会话；Safari / 默认浏览器的官网登录状态独立。
+- 默认使用系统浏览器登录，复用其 Krill、GitHub、Apple 等已有状态；官网目前没有桌面授权回传接口，需按窗口指引手动导入一次会话，验证通过后存入钥匙串。Safari 可从“开发”菜单打开 JavaScript 控制台（需先在 Safari 设置中启用开发者功能）；Chrome / Edge 可使用 `⌥⌘J`，Firefox 可使用 `⌥⌘K`。
+- 可选应用内 WKWebView 使用非持久会话，允许第三方 HTTPS 跳转；授权弹窗共享这次临时会话并保留 opener，关闭主登录窗口时一并销毁。它与默认浏览器的会话独立，受提供商对嵌入式登录的限制。
 
 ## 迁移后的验收顺序
 
 1. 运行 `verify.sh`，确认 Swift 6 并发检查、Apple SDK 编译、所有 Swift 测试和 AppKit 入口检查通过；入口检查会拒绝重新引入 SwiftUI `App` / `Settings` 窗口场景。再运行 `build.sh` 验证 .app 生成与签名检查。
 2. 用 `--demo` 检查五个页签、套餐切换与进度环、未知 / 零额度、滚动、Esc、右键菜单、固定面板与退出。
 3. 检查浅色 / 深色菜单栏、外接屏、Retina 缩放、菜单栏自动隐藏和屏幕空间不足时的弹出位置；检查 macOS 26 玻璃分支以及旧系统材质回退。
-4. 在官网登录窗口完成 GitHub 和可能的二次验证，确认 `/api/auth/me` 与套餐接口成功，关闭并重新启动后恢复会话。若网站拒绝嵌入式浏览器，需按网站支持的授权方式重新设计登录入口，当前不能视为已验证。
+4. 在系统浏览器复用已有 Krill 登录，按窗口指引导入会话；再验证邮箱、Google、Linux.do、GitHub → Apple 和二次验证等可用流程。检查应用内第三方跳转、弹窗回传及独立关闭；提供商拒绝嵌入式登录时改用系统浏览器。确认 `/api/auth/me` 与套餐接口成功，关闭并重新启动后恢复会话。真实账号流程仍需人工验收。
 5. 检查断网保留数据与重试间隔、睡眠唤醒、401 失效、重新登录、退出清除钥匙串，以及旧请求不会覆盖新会话。
 6. 在固定安装位置检查登录启动的启用、系统批准和关闭；确认首次启动、登录启动及再次打开应用均只显示菜单栏图标，点击图标后才展开面板。
 

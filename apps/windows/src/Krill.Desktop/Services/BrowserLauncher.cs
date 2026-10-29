@@ -13,4 +13,5 @@ public static class BrowserLauncher
     }
     public static void OpenRuntimeDownload() => Process.Start(new ProcessStartInfo(
         "https://developer.microsoft.com/microsoft-edge/webview2/") { UseShellExecute = true });
+    public static void OpenLogin() => Process.Start(new ProcessStartInfo(BrowserLogin.LoginUrl.AbsoluteUri) { UseShellExecute = true });
 }

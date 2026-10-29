@@ -1,0 +1,71 @@
+{
+  "evaluation_time": "2099-10-20T00:00:00Z",
+  "success": true,
+  "code": 200,
+  "data": {
+    "credit_balance_usd": "24.80",
+    "welfare_balance_usd": "3.50",
+    "subscriptions": [
+      {
+        "subscription_id": 100, "status": "active", "consume_priority": 0,
+        "plan": {"name": "Sample daily card", "billing_type": "usd_daily"},
+        "quota": {"daily_limit_usd": "20", "remaining_usd": "10"}
+      },
+      {
+        "subscription_id": 201, "status": "active", "consume_priority": 1,
+        "subscription_end_at": "2099-10-21T00:00:00Z",
+        "plan": {"name": "Sample depleted month", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "used_usd": "100", "remaining_usd": "0"}
+      },
+      {
+        "subscription_id": 202, "status": "active", "consume_priority": 2,
+        "subscription_start_at": "2099-10-20T00:00:10Z", "subscription_end_at": "2099-11-20T00:00:10Z",
+        "plan": {"name": "Sample upcoming month", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "remaining_usd": "100"}
+      },
+      {
+        "subscription_id": 203, "status": "active", "consume_priority": 3,
+        "subscription_end_at": "2099-10-20T00:00:00Z",
+        "plan": {"name": "Sample expired month", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "remaining_usd": "90"}
+      },
+      {
+        "subscription_id": 204, "status": "frozen", "consume_priority": 4,
+        "plan": {"name": "Sample frozen month", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "remaining_usd": "90"}
+      },
+      {
+        "subscription_id": 205, "status": "active", "consume_priority": 10,
+        "subscription_end_at": "2099-10-20T00:00:10Z",
+        "plan": {"name": "Sample usable month A", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "used_usd": "20", "remaining_usd": "80"}
+      },
+      {
+        "subscription_id": 206, "status": "active", "consume_priority": 10,
+        "subscription_end_at": "2099-10-21T00:00:00Z",
+        "plan": {"name": "Sample usable month B", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "used_usd": "50", "remaining_usd": "50"}
+      },
+      {
+        "subscription_id": 207, "status": "active", "consume_priority": 5,
+        "plan": {"name": "Sample 30-day request card", "billing_type": "request_count", "duration_days": "30"},
+        "quota": {"limit_requests": "1000", "remaining_requests": "0"}
+      },
+      {
+        "subscription_id": 208, "status": "active", "consume_priority": 20,
+        "plan": {"name": "Sample month with carryover", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "remaining_usd": "0", "forwarded_remaining_usd": "3"}
+      },
+      {
+        "subscription_id": 209, "status": "active", "consume_priority": 30,
+        "plan": {"name": "Sample unknown month quota", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "remaining_usd": null}
+      },
+      {
+        "subscription_id": 210, "status": "active", "consume_priority": 6,
+        "plan": {"name": "Sample overdrawn month", "billing_type": "usd_monthly"},
+        "quota": {"daily_limit_usd": "100", "remaining_usd": "-0.01"}
+      }
+    ]
+  }
+}
