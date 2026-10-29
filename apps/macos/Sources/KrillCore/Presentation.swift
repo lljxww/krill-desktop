@@ -13,8 +13,14 @@ public struct QuotaProjection: Sendable {
         guard let limit, limit > 0, let remaining else { return nil }
         return min(100, max(0, NSDecimalNumber(decimal: remaining / limit * 100).doubleValue))
     }
-    public init(_ subscription: Subscription) {
+    public init(_ subscription: Subscription, requestCountQuota: RequestCountQuota? = nil) {
         let q = subscription.quota
+        if subscription.plan.billingType == "request_count",
+           let window = requestCountQuota?.windows.filter({ $0.percent != nil }).min(by: { ($0.percent ?? 100) < ($1.percent ?? 100) }) {
+            cycle = "按次额度 · " + window.label; unit = "次"; isMoney = false; forwarded = nil; resetAt = nil
+            limit = window.limit.map { Decimal($0) }; used = window.used.map { Decimal($0) }; remaining = window.remaining
+            return
+        }
         resetAt = q.windowResetAt
         if subscription.plan.billingType == "request_count" {
             cycle = "按次额度"; unit = "次"; isMoney = false; forwarded = nil

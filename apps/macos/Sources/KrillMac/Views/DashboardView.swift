@@ -130,6 +130,10 @@ struct DashboardView: View {
                 Metric(title: "Tokens", value: store.stats.map { DisplayFormat.compact($0.totalTokens) } ?? "—")
                 Metric(title: "费用 / USD", value: DisplayFormat.cost(store.stats?.totalCostUsd), accent: true)
             }
+            HStack(spacing: 10) {
+                Metric(title: "缓存率", value: DisplayFormat.percentage(store.stats?.cachePercent))
+                Metric(title: "可用重置卡", value: store.resetCardsLoaded ? String(store.resetCards.filter { $0.canUse(at: store.resetCardsDate) }.count) + " 张" : "—")
+            }
             sectionHeader("最新公告", action: "全部公告") { store.tab = .announcements }
             if store.announcements.isEmpty { Text(store.announcementNote).foregroundStyle(KrillTheme.muted).font(.system(size: 12)) }
             ForEach(Array(store.announcements.prefix(2))) { announcementCard($0) }
@@ -145,12 +149,13 @@ struct DashboardView: View {
                 ForEach(store.activePlans) { plan in Text(plan.plan.name).tag(Optional(plan.id)) }
             }.labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity, alignment: .leading)
             ForEach(store.plans) { planCard($0) }
+            resetCardsSection
             Text("金额单位为 USD。结转额度单独显示；套餐变更、续费与支付请前往官网。")
                 .font(.system(size: 11)).foregroundStyle(KrillTheme.muted).lineSpacing(5)
         }
     }
     private func planCard(_ plan: Subscription) -> some View {
-        let quota = QuotaProjection(plan)
+        let quota = QuotaProjection(plan, requestCountQuota: store.subscriptions?.requestCountQuota)
         let state = plan.availability(at: store.subscriptionDate)
         let available = state == .available
         let accent = available ? KrillTheme.mint : KrillTheme.muted
@@ -170,6 +175,15 @@ struct DashboardView: View {
             ProgressView(value: quota.percent ?? 0, total: 100).tint(accent)
                 .accessibilityLabel("剩余额度").accessibilityValue(quota.percent.map { String(format: "%.0f%%", $0) } ?? "未知")
             Text("已用 \(quota.amount(quota.used))").font(.system(size: 11)).foregroundStyle(KrillTheme.muted)
+            if plan.plan.billingType == "request_count" {
+                Text("狂蹬卡 / 按次额度 · 账号共享限额").font(.system(size: 11)).foregroundStyle(KrillTheme.muted)
+                ForEach(requestWindows(for: plan)) { window in
+                    detailRow(window.label, value: window.detail)
+                    ProgressView(value: window.percent ?? 0, total: 100).tint(accent)
+                        .accessibilityLabel(window.label + "剩余请求额度").accessibilityValue(window.percent.map { String(format: "%.1f%%", $0) } ?? "未知")
+                }
+                Text(store.subscriptions?.requestCountQuota?.cycle ?? "周期时间未提供").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
+            }
             if let forwarded = quota.forwarded, forwarded > 0 { Text("另有结转 \(DisplayFormat.money(forwarded))").font(.system(size: 11)).foregroundStyle(accent) }
             Divider()
             HStack {
@@ -177,6 +191,37 @@ struct DashboardView: View {
                 Spacer(); Text("\(DisplayFormat.date(plan.subscriptionEndAt)) 到期")
             }.font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
         }.saturation(available ? 1 : 0).opacity(available ? 1 : 0.55)
+    }
+    private func requestWindows(for plan: Subscription) -> [RequestQuotaWindow] {
+        store.subscriptions?.requestCountQuota?.windows ?? [
+            RequestQuotaWindow(label: "5 小时", used: nil, limit: plan.plan.rateLimit5h),
+            RequestQuotaWindow(label: "本周", used: nil, limit: plan.plan.rateLimitWeekly),
+            RequestQuotaWindow(label: "本月", used: nil, limit: plan.plan.rateLimitMonthly)
+        ]
+    }
+    private var resetCardsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader("重置卡", action: "官网管理 ↗") { store.openWebsite() }
+            Text(store.resetCardsSummary).foregroundStyle(KrillTheme.mint)
+            Text(store.resetCardsNote).font(.system(size: 11)).foregroundStyle(KrillTheme.muted)
+            if store.resetCardsLoaded && store.resetCards.isEmpty { Text("暂无重置卡").foregroundStyle(KrillTheme.muted) }
+            ForEach(store.resetCards) { card in
+                Card {
+                    HStack {
+                        Text(card.planName ?? "重置卡").fontWeight(.semibold)
+                        Spacer(); Text("#\(card.id)").foregroundStyle(KrillTheme.muted)
+                    }
+                    Text(card.availabilityText(at: store.resetCardsDate)).foregroundStyle(card.canUse(at: store.resetCardsDate) ? KrillTheme.mint : KrillTheme.muted)
+                    detailRow("单张恢复上限", value: DisplayFormat.money(card.capUsd))
+                    detailRow("有效期", value: card.expiresAt.map { DisplayFormat.date($0) + " 前有效" } ?? "长期有效")
+                    if card.state(at: store.resetCardsDate) == .used {
+                        detailRow("实际恢复", value: DisplayFormat.money(card.grantedUsd))
+                        detailRow("使用时间", value: DisplayFormat.date(card.usedAt))
+                    }
+                    if let note = card.note, !note.isEmpty { Text(DisplayFormat.plainText(note)).font(.system(size: 11)).foregroundStyle(KrillTheme.muted) }
+                }.opacity(card.state(at: store.resetCardsDate) == .unused ? 1 : 0.55)
+            }
+        }
     }
     private var usage: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -193,8 +238,23 @@ struct DashboardView: View {
             }
             Card {
                 detailRow("请求成功率", value: store.stats.flatMap { $0.totalRequests > 0 ? String(format: "%.1f%%", Double($0.successRequests) / Double($0.totalRequests) * 100) : nil } ?? "—")
-                detailRow("输入 Tokens", value: store.stats.map { DisplayFormat.compact($0.inputTokens) } ?? "—")
+                detailRow("成功请求", value: store.stats.map { DisplayFormat.optionalCount($0.successRequests) } ?? "—")
+                detailRow("失败请求", value: DisplayFormat.optionalCount(store.stats?.failedRequests))
+                detailRow("每分钟请求 / RPM", value: DisplayFormat.rate(store.stats?.rpm))
+                detailRow("每分钟 Tokens / TPM", value: DisplayFormat.rate(store.stats?.tpm))
+                detailRow("输入 Tokens", value: DisplayFormat.optionalCount(store.stats?.inputTokens))
                 detailRow("输出 Tokens", value: store.stats.map { DisplayFormat.compact($0.outputTokens) } ?? "—")
+                detailRow("思考 Tokens", value: DisplayFormat.optionalCount(store.stats?.reasoningTokens))
+            }
+            Card {
+                Text("缓存用量").fontWeight(.semibold)
+                detailRow("缓存率", value: DisplayFormat.percentage(store.stats?.cachePercent))
+                detailRow("缓存读取 Tokens", value: DisplayFormat.optionalCount(store.stats?.cacheReadInputTokens))
+                detailRow("缓存写入 Tokens", value: DisplayFormat.optionalCount(store.stats?.cacheCreationInputTokens))
+                Text("优先使用官网缓存统计口径；缺失时按缓存读取 /（输入 + 缓存写入 + 缓存读取）计算。").font(.system(size: 10)).foregroundStyle(KrillTheme.muted)
+                ForEach(Array((store.stats?.channelCacheRates ?? []).enumerated()), id: \.offset) { _, channel in
+                    detailRow(DisplayFormat.plainText(channel.channelName, limit: 60), value: DisplayFormat.percentage(channel.cacheRate.map { $0 * 100 }))
+                }
             }
             Button("在官网查看完整用量记录 ↗") { store.openWebsite(.logs) }.foregroundStyle(KrillTheme.mint)
         }

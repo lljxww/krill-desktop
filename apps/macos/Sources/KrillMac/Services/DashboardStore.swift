@@ -18,6 +18,10 @@ final class DashboardStore: ObservableObject {
     @Published private(set) var subscriptions: SubscriptionResponse?
     @Published private(set) var subscriptionDate = Date()
     @Published private(set) var stats: RequestStats?
+    @Published private(set) var resetCards: [ResetCard] = []
+    @Published private(set) var resetCardsNote = "连接后加载重置卡。"
+    @Published private(set) var resetCardsLoaded = false
+    @Published private(set) var resetCardsDate = Date()
     @Published private(set) var announcements: [Announcement] = []
     @Published private(set) var isLoading = false
     @Published private(set) var isDemo = false
@@ -42,6 +46,8 @@ final class DashboardStore: ObservableObject {
     private var lastDetails: Date?
     private var lastAttempt: Date?
     private var nextSubscriptionTransition: Date?
+    private var nextResetCardExpiry: Date?
+    private var lastResetCards: Date?
     private var pollingTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var wakeObserver: NSObjectProtocol?
@@ -63,7 +69,10 @@ final class DashboardStore: ObservableObject {
     var selectedPlan: KrillCore.Subscription? {
         SubscriptionSelection.select(plans, preferredID: preferences.selectedSubscriptionID, at: subscriptionDate)
     }
-    var quota: QuotaProjection? { selectedPlan.map(QuotaProjection.init) }
+    var quota: QuotaProjection? { selectedPlan.map { QuotaProjection($0, requestCountQuota: subscriptions?.requestCountQuota) } }
+    var resetCardsSummary: String {
+        resetCardsLoaded ? "\(resetCards.filter { $0.canUse(at: resetCardsDate) }.count) 张可用 · \(resetCards.count) 张记录" : "—"
+    }
     var percent: Double? { quota?.percent }
     var hasData: Bool { subscriptions != nil }
     var accent: ColorStyle { isStale || needsLogin ? .muted : (percent.map { $0 < 20 } ?? false) ? .amber : .mint }
@@ -88,6 +97,7 @@ final class DashboardStore: ObservableObject {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 guard let self else { return }
                 self.advanceSubscriptionTime()
+                self.advanceResetCardTime()
                 let interval = min(300, (self.isPanelVisible ? min(30, self.preferences.refreshSeconds) : self.preferences.refreshSeconds) * (1 << min(self.failures, 3)))
                 if self.lastAttempt.map({ Date().timeIntervalSince($0) >= Double(interval) }) ?? true {
                     self.requestRefresh()
@@ -124,6 +134,16 @@ final class DashboardStore: ObservableObject {
             guard current == generation else { return }
             profile = account; applySubscriptions(response); updatedAt = Date()
             needsLogin = false; isStale = false; failures = 0; statusDetail = "账号数据已同步，后台会自动更新。"
+            if isPanelVisible && (lastResetCards.map { Date().timeIntervalSince($0) >= 30 } ?? true) {
+                do {
+                    let result = try await api.resetCards(token: token)
+                    try Task.checkCancellation()
+                    guard current == generation else { return }
+                    applyResetCards(result)
+                } catch let error as APIFailure where error == .sessionExpired { throw error }
+                catch is CancellationError { throw CancellationError() }
+                catch { if current == generation { resetCardsNote = "重置卡暂时无法更新，已保留上次结果。" } }
+            }
             if isPanelVisible && (lastDetails.map { Date().timeIntervalSince($0) >= 30 } ?? true) {
                 do {
                     let result = try await api.stats(token: token)
@@ -154,6 +174,16 @@ final class DashboardStore: ObservableObject {
         }
     }
     func loginRequested() { openLogin?() }
+    func applyResetCards(_ response: ResetCardsResponse, at now: Date = Date()) {
+        resetCards = response.items; resetCardsLoaded = true; resetCardsDate = now; lastResetCards = now
+        resetCardsNote = "重置卡只恢复适用订阅的本周额度；使用与预览请前往官网。"
+        nextResetCardExpiry = resetCards.compactMap { $0.expiresAt }.filter { $0 > now }.min()
+    }
+    func advanceResetCardTime(at now: Date = Date()) {
+        guard let nextResetCardExpiry, now >= nextResetCardExpiry else { return }
+        resetCardsDate = now
+        self.nextResetCardExpiry = resetCards.compactMap { $0.expiresAt }.filter { $0 > now }.min()
+    }
     func applySubscriptions(_ response: SubscriptionResponse, at now: Date = Date()) {
         let wasMonthly = selectedPlan?.isMonthly ?? false
         subscriptions = response
@@ -188,14 +218,16 @@ final class DashboardStore: ObservableObject {
     func useDemo() {
         resetSession(); token = nil; isDemo = true; needsLogin = false; isStale = false
         profile = DemoData.profile; applySubscriptions(DemoData.subscriptions()); stats = DemoData.stats()
+        applyResetCards(DemoData.resetCards())
         announcements = DemoData.announcements(); updatedAt = Date(); statusDetail = "虚构样例，不代表真实账号。"
         statsNote = "今日 · 演示数据"; announcementNote = "虚构演示公告"
     }
     private func resetSession() {
-        generation += 1; refreshTask?.cancel(); refreshTask = nil; isLoading = false; failures = 0; lastAnnouncements = nil; lastDetails = nil
+        generation += 1; refreshTask?.cancel(); refreshTask = nil; isLoading = false; failures = 0; lastAnnouncements = nil; lastDetails = nil; lastResetCards = nil
     }
     private func clearView() {
         profile = nil; subscriptions = nil; nextSubscriptionTransition = nil; stats = nil; announcements = []; updatedAt = nil
+        resetCards = []; resetCardsLoaded = false; nextResetCardExpiry = nil; resetCardsNote = "连接后加载重置卡。"
         isDemo = false; needsLogin = true; isStale = false; tab = .overview
         statusDetail = "使用浏览器或官网任意登录方式连接账号。"; statsNote = "连接账号后加载今日统计。"
     }

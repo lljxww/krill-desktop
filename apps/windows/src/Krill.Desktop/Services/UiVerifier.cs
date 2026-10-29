@@ -64,6 +64,21 @@ internal static class UiVerifier
         if (app.ViewModel.PrimaryRemaining != "$16.80" || app.ViewModel.OrbText != "84%") throw new InvalidOperationException("Plan selection did not update the orb.");
         app.ViewModel.SelectedPlan = app.ViewModel.SelectablePlans.Single(p => p.Id == 1);
         checks.Add("plan_selection_updates_orb");
+        app.ViewModel.SelectedPlan = app.ViewModel.SelectablePlans.Single(p => p.Id == 3);
+        if (app.ViewModel.PrimaryRemaining != "77 次" || app.ViewModel.OrbText != "77%" ||
+            app.ViewModel.SelectedPlan.RequestWindows.Length != 3 || app.ViewModel.SelectedPlan.RequestWindows[0].Used != 23)
+            throw new InvalidOperationException("Shared request-count windows did not update the orb.");
+        checks.Add("request_count_shared_windows_update_orb");
+        if (app.ViewModel.CacheRateText != "64.0%" || !app.ViewModel.UsageDetails.Any(x => x.Label == "失败请求" && x.Value == "2"))
+            throw new InvalidOperationException("Rich request/cache statistics were not projected.");
+        checks.Add("cache_and_request_details");
+        if (app.ViewModel.ResetCardsSummary != "1 张可用 · 2 张记录") throw new InvalidOperationException("Reset card status mismatch.");
+        app.ViewModel.ReportResetCardsFailure();
+        if (app.ViewModel.ResetCards.Count != 2) throw new InvalidOperationException("Reset card failure discarded valid data.");
+        app.ViewModel.AdvanceSubscriptionTime(DateTimeOffset.UtcNow.AddDays(3));
+        if (app.ViewModel.ResetCardsSummary != "0 张可用 · 2 张记录") throw new InvalidOperationException("Reset card expiry was not reflected.");
+        checks.Add("reset_card_expiry_and_failure_retention");
+        app.UseDemo();
         var rolloverTime = DateTimeOffset.UtcNow;
         var exhausted = new Subscription { SubscriptionId = 301, Status = "active", ConsumePriority = 1,
             Plan = new Plan { Name = "Synthetic exhausted month", BillingType = "usd_monthly" },
@@ -118,7 +133,8 @@ internal static class UiVerifier
         await Task.Delay(120);
         await app.Panel.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
         Capture(app.Panel, Path.Combine(output, "welcome.png"));
-        if (app.ViewModel.HasData || app.ViewModel.CreditText != "—" || app.ViewModel.Plans.Count != 0) throw new InvalidOperationException("Signout data not cleared.");
+        if (app.ViewModel.HasData || app.ViewModel.CreditText != "—" || app.ViewModel.Plans.Count != 0 || app.ViewModel.ResetCards.Count != 0 ||
+            app.ViewModel.ResetCardsSummary != "—" || app.ViewModel.CacheDetails.Count != 0 || app.ViewModel.CacheRateText != "—") throw new InvalidOperationException("Signout data not cleared.");
         checks.Add("signout_clears_view");
 
         const string testToken = "synthetic.header.signature";

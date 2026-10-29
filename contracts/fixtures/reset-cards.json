@@ -1,0 +1,73 @@
+{
+  "success": true,
+  "code": 200,
+  "data": {
+    "items": [
+      {
+        "id": "601",
+        "plan_name": "Sample weekly plan",
+        "status": 0,
+        "expired": false,
+        "cap_usd": "30.00",
+        "expires_at": "2099-10-21T00:00:00Z",
+        "usable_subscriptions": [
+          {
+            "subscription_id": "101"
+          }
+        ],
+        "note": "Synthetic card"
+      },
+      {
+        "id": 602,
+        "status": "1",
+        "expired": true,
+        "cap_usd": "20",
+        "granted_usd": "12.50",
+        "expires_at": "2099-10-19T00:00:00Z",
+        "used_at": "2099-10-18T00:00:00Z",
+        "usable_subscriptions": []
+      },
+      {
+        "id": 603,
+        "status": 2,
+        "expired": true,
+        "cap_usd": 10,
+        "usable_subscriptions": []
+      },
+      {
+        "id": 604,
+        "status": 0,
+        "expired": false,
+        "cap_usd": "30",
+        "expires_at": "2099-10-20T00:00:00Z",
+        "usable_subscriptions": [
+          {
+            "subscription_id": 101
+          }
+        ]
+      },
+      {
+        "id": 605,
+        "status": 0,
+        "expired": false,
+        "expires_at": null,
+        "usable_subscriptions": []
+      },
+      {
+        "id": 606,
+        "status": null,
+        "cap_usd": null
+      },
+      {
+        "id": 607,
+        "status": 0,
+        "expired": true,
+        "usable_subscriptions": [
+          {
+            "subscription_id": 101
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -74,6 +74,9 @@ public sealed partial class KrillApiClient(HttpClient http)
     public Task<SubscriptionResponse> GetSubscriptionsAsync(string token, CancellationToken ct = default) =>
         SendAsync<SubscriptionResponse>(HttpMethod.Get, "/api/subscription", token, cancellationToken: ct);
 
+    public Task<ResetCardsResponse> GetResetCardsAsync(string token, CancellationToken ct = default) =>
+        SendAsync<ResetCardsResponse>(HttpMethod.Get, "/api/reset-cards", token, cancellationToken: ct);
+
     public Task<RequestStats> GetStatsAsync(string token, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default) =>
         SendAsync<RequestStats>(HttpMethod.Post, "/api/request-logs/stats", token,
             new { StartTime = from.ToUniversalTime().ToString("O"), EndTime = to.ToUniversalTime().ToString("O") }, ct);

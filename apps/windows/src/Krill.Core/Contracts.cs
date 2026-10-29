@@ -36,6 +36,7 @@ public sealed class UserProfile
 
 public sealed class SubscriptionResponse
 {
+    public RequestCountQuota? RequestCountQuota { get; set; }
     public List<Subscription> Subscriptions { get; set; } = [];
     public SubscriptionSummary? Summary { get; set; }
     public decimal? CreditBalanceUsd { get; set; }
@@ -67,6 +68,9 @@ public sealed class Subscription
 
 public sealed class Plan
 {
+    [JsonPropertyName("rate_limit_5h")] public long? RateLimit5h { get; set; }
+    public long? RateLimitWeekly { get; set; }
+    public long? RateLimitMonthly { get; set; }
     public long Id { get; set; }
     public string Name { get; set; } = "Krill 套餐";
     public string? BillingType { get; set; }
@@ -96,14 +100,64 @@ public sealed class Quota
 
 public sealed class RequestStats
 {
+    public long? CacheReadInputTokens { get; set; }
+    public long? CacheCreationInputTokens { get; set; }
+    public long? CacheRateEligibleTokens { get; set; }
+    public long? CacheRateReadTokens { get; set; }
+    public long? ReasoningTokens { get; set; }
+    public decimal? Rpm { get; set; }
+    public decimal? Tpm { get; set; }
+    public List<ChannelCacheRate> ChannelCacheRates { get; set; } = [];
     public long TotalRequests { get; set; }
     public long SuccessRequests { get; set; }
-    public long FailedRequests { get; set; }
+    public long? FailedRequests { get; set; }
     public long TotalTokens { get; set; }
-    public long InputTokens { get; set; }
+    public long? InputTokens { get; set; }
     public long OutputTokens { get; set; }
     public decimal? TotalCostUsd { get; set; }
     public List<TrendBucket> Trend { get; set; } = [];
+}
+
+public sealed class ChannelCacheRate
+{
+    public string ChannelName { get; set; } = "未知渠道";
+    public decimal? CacheRate { get; set; }
+}
+
+public sealed class RequestCountQuota
+{
+    [JsonPropertyName("used_5h")] public long? Used5h { get; set; }
+    [JsonPropertyName("limit_5h")] public long? Limit5h { get; set; }
+    public long? UsedWeekly { get; set; }
+    public long? LimitWeekly { get; set; }
+    public long? UsedMonthly { get; set; }
+    public long? LimitMonthly { get; set; }
+    public string? CycleStart { get; set; }
+    public string? CycleEnd { get; set; }
+}
+
+public sealed class ResetCardsResponse
+{
+    public List<ResetCard> Items { get; set; } = [];
+}
+
+public sealed class ResetCard
+{
+    public long Id { get; set; }
+    public string? PlanName { get; set; }
+    public int? Status { get; set; }
+    public bool? Expired { get; set; }
+    public decimal? CapUsd { get; set; }
+    public decimal? GrantedUsd { get; set; }
+    public DateTimeOffset? ExpiresAt { get; set; }
+    public DateTimeOffset? UsedAt { get; set; }
+    public string? Note { get; set; }
+    public List<ResetCardSubscription>? UsableSubscriptions { get; set; }
+}
+
+public sealed class ResetCardSubscription
+{
+    public long SubscriptionId { get; set; }
 }
 
 public sealed class TrendBucket

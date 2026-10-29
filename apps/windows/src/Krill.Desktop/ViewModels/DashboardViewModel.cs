@@ -12,6 +12,10 @@ public sealed record DashboardActions(Func<Task> Login, Func<Task> Refresh, Acti
 
 public sealed record SubscriptionCard(Subscription Source, QuotaProjection Quota, SubscriptionAvailability Availability)
 {
+    public RequestCountQuota? SharedRequests { get; init; }
+    public bool IsRequestCount => Source.Plan.BillingType == "request_count";
+    public RequestQuotaWindow[] RequestWindows => AccountDetails.Windows(SharedRequests, Source.Plan);
+    public string RequestCycle => AccountDetails.Cycle(SharedRequests);
     public bool IsActive => Availability == SubscriptionAvailability.Available;
     public double Opacity => IsActive ? 1 : 0.55;
     public string Accent => IsActive ? "#7CE3CD" : "#91A6B2";
@@ -31,6 +35,18 @@ public sealed record SubscriptionCard(Subscription Source, QuotaProjection Quota
 
 public sealed record AnnouncementCard(long Id, string Title, string Summary, string Date, bool IsUnread);
 public sealed record ChartBar(double Height, string Tooltip);
+public sealed record DetailRow(string Label, string Value);
+public sealed record ResetCardDisplay(ResetCard Source, DateTimeOffset At)
+{
+    public string Name => Source.PlanName ?? "重置卡";
+    public string State => AccountDetails.AvailabilityText(Source, At);
+    public string Cap => DisplayFormat.Money(Source.CapUsd);
+    public string Expiry => Source.ExpiresAt is { } date ? DisplayFormat.LocalDate(date) + " 前有效" : "长期有效";
+    public string Usage => AccountDetails.State(Source, At) == ResetCardState.Used
+        ? $"{DisplayFormat.LocalDate(Source.UsedAt)} 使用 · 实际恢复 {DisplayFormat.Money(Source.GrantedUsd)}" : "#" + Source.Id;
+    public string Note => string.IsNullOrWhiteSpace(Source.Note) ? "" : DisplayFormat.PlainText(Source.Note);
+    public double Opacity => AccountDetails.State(Source, At) == ResetCardState.Unused ? 1 : 0.55;
+}
 
 public partial class DashboardViewModel : ObservableObject
 {
@@ -41,6 +57,8 @@ public partial class DashboardViewModel : ObservableObject
     private SubscriptionResponse? _subscriptions;
     private DateTimeOffset? _nextSubscriptionTransition;
     private RequestStats? _stats;
+    private ResetCardsResponse? _resetCards;
+    private DateTimeOffset? _nextResetCardExpiry;
 
     public DashboardViewModel(ClientSettings settings, DashboardActions actions)
     {
@@ -70,6 +88,12 @@ public partial class DashboardViewModel : ObservableObject
     public ObservableCollection<AnnouncementCard> Announcements { get; } = [];
     public ObservableCollection<AnnouncementCard> RecentAnnouncements { get; } = [];
     public ObservableCollection<ChartBar> ChartBars { get; } = [];
+    public ObservableCollection<DetailRow> UsageDetails { get; } = [];
+    public ObservableCollection<DetailRow> CacheDetails { get; } = [];
+    public ObservableCollection<ResetCardDisplay> ResetCards { get; } = [];
+    [ObservableProperty] private string cacheRateText = "—";
+    [ObservableProperty] private string resetCardsSummary = "—";
+    [ObservableProperty] private string resetCardsNote = "连接后加载重置卡。";
     public int[] RefreshIntervals { get; } = [30, 60, 120, 300];
 
     [ObservableProperty] private int selectedTab;
@@ -163,7 +187,8 @@ public partial class DashboardViewModel : ObservableObject
         Plans.Clear(); SelectablePlans.Clear();
         foreach (var subscription in SubscriptionSelection.Ordered(response.Subscriptions))
         {
-            var card = new SubscriptionCard(subscription, QuotaProjection.From(subscription), SubscriptionSelection.Availability(subscription, now));
+            var card = new SubscriptionCard(subscription, QuotaProjection.From(subscription, response.RequestCountQuota), SubscriptionSelection.Availability(subscription, now))
+            { SharedRequests = response.RequestCountQuota };
             Plans.Add(card); if (card.IsActive) SelectablePlans.Add(card);
         }
         SelectedPlan = SelectablePlans.FirstOrDefault(x => x.Id == selected?.SubscriptionId);
@@ -182,7 +207,19 @@ public partial class DashboardViewModel : ObservableObject
     {
         var time = now ?? DateTimeOffset.UtcNow;
         if (_subscriptions is not null && _nextSubscriptionTransition <= time) ApplySubscriptions(_subscriptions, time);
+        if (_resetCards is not null && _nextResetCardExpiry <= time) ApplyResetCards(_resetCards, time);
     }
+
+    public void ApplyResetCards(ResetCardsResponse response, DateTimeOffset? now = null)
+    {
+        var at = now ?? DateTimeOffset.UtcNow;
+        _resetCards = response; ResetCards.Clear();
+        foreach (var card in response.Items) ResetCards.Add(new ResetCardDisplay(card, at));
+        ResetCardsSummary = $"{response.Items.Count(x => AccountDetails.CanUse(x, at))} 张可用 · {response.Items.Count} 张记录";
+        ResetCardsNote = response.Items.Count == 0 ? "暂无重置卡。" : "重置卡只恢复适用订阅的本周额度；使用与预览请前往官网。";
+        _nextResetCardExpiry = response.Items.Select(x => x.ExpiresAt).Where(x => x > at).Min();
+    }
+    public void ReportResetCardsFailure() => ResetCardsNote = "重置卡暂时无法更新，已保留上次结果。";
 
     private void ProjectQuota()
     {
@@ -211,8 +248,19 @@ public partial class DashboardViewModel : ObservableObject
         TokensText = DisplayFormat.Compact(stats.TotalTokens);
         CostText = DisplayFormat.Cost(stats.TotalCostUsd);
         SuccessRateText = stats.TotalRequests > 0 ? $"{(double)stats.SuccessRequests / stats.TotalRequests * 100:0.#}%" : "—";
-        InputTokensText = DisplayFormat.Compact(stats.InputTokens);
+        InputTokensText = AccountDetails.Count(stats.InputTokens);
         OutputTokensText = DisplayFormat.Compact(stats.OutputTokens);
+        CacheRateText = AccountDetails.Percentage(AccountDetails.CachePercent(stats));
+        UsageDetails.Clear(); CacheDetails.Clear();
+        foreach (var row in new DetailRow[] {
+            new("成功请求", AccountDetails.Count(stats.SuccessRequests)), new("失败请求", AccountDetails.Count(stats.FailedRequests)),
+            new("每分钟请求 / RPM", AccountDetails.Rate(stats.Rpm)), new("每分钟 Tokens / TPM", AccountDetails.Rate(stats.Tpm)),
+            new("思考 Tokens", AccountDetails.Count(stats.ReasoningTokens)) }) UsageDetails.Add(row);
+        CacheDetails.Add(new("缓存率", CacheRateText));
+        CacheDetails.Add(new("缓存读取 Tokens", AccountDetails.Count(stats.CacheReadInputTokens)));
+        CacheDetails.Add(new("缓存写入 Tokens", AccountDetails.Count(stats.CacheCreationInputTokens)));
+        foreach (var channel in stats.ChannelCacheRates ?? [])
+            CacheDetails.Add(new(DisplayFormat.PlainText(channel.ChannelName, 60), AccountDetails.Percentage(channel.CacheRate * 100)));
         StatsNote = $"今日 · 本机时区 · 更新于 {DateTime.Now:HH:mm}";
         ChartBars.Clear();
         var buckets = (stats.Trend ?? []).TakeLast(48).ToArray();
@@ -256,6 +304,8 @@ public partial class DashboardViewModel : ObservableObject
         NeedsLogin = true; IsStale = false; IsLoading = false;
         Plans.Clear(); SelectablePlans.Clear(); SelectedPlan = null; _nextSubscriptionTransition = null;
         ChartBars.Clear(); Announcements.Clear(); RecentAnnouncements.Clear();
+        _resetCards = null; _nextResetCardExpiry = null; ResetCards.Clear(); UsageDetails.Clear(); CacheDetails.Clear();
+        CacheRateText = ResetCardsSummary = "—"; ResetCardsNote = "连接后加载重置卡。";
         UserName = "你的桌面用量助手"; UserEmail = "连接账号，随时掌握剩余额度"; AvatarText = "K";
         CreditText = WelfareText = RequestsText = TokensText = CostText = SuccessRateText = InputTokensText = OutputTokensText = "—";
         LastUpdatedText = "等待首次同步"; StatusTitle = "尚未连接";

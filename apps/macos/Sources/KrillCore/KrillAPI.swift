@@ -17,6 +17,7 @@ public enum APIFailure: Error, Sendable, Equatable {
 public enum KrillEndpoint: String, Sendable {
     case profile = "/api/auth/me", subscriptions = "/api/subscription"
     case stats = "/api/request-logs/stats", announcements = "/api/public/announcements"
+    case resetCards = "/api/reset-cards"
 }
 
 public enum KrillOrigin {
@@ -103,6 +104,7 @@ public actor KrillAPI {
     }
     public func profile(token: String) async throws -> UserProfile { try await send(UserProfile.self, endpoint: .profile, token: token) }
     public func subscriptions(token: String) async throws -> SubscriptionResponse { try await send(SubscriptionResponse.self, endpoint: .subscriptions, token: token) }
+    public func resetCards(token: String) async throws -> ResetCardsResponse { try await send(ResetCardsResponse.self, endpoint: .resetCards, token: token) }
     public func stats(token: String, now: Date = Date()) async throws -> RequestStats {
         let range = DisplayFormat.dayRange(now: now)
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

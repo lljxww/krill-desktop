@@ -6,6 +6,66 @@ using Krill.Core;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
+    ("Stats decode cache counters, channel rates, requests and speed", () => Sync(() =>
+    {
+        var stats = JsonSerializer.Deserialize<ApiEnvelope<RequestStats>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "stats.json")), KrillJson.Options)!.Data!;
+        Equal(2L, stats.FailedRequests); Equal(64m, AccountDetails.CachePercent(stats));
+        Equal(640000L, stats.CacheReadInputTokens); Equal(120000L, stats.CacheCreationInputTokens);
+        Equal(48500L, stats.ReasoningTokens); Equal(1.8m, stats.Rpm); Equal(17842m, stats.Tpm);
+        Equal(0.64m, stats.ChannelCacheRates[0].CacheRate); Equal("64.0%", AccountDetails.Percentage(AccountDetails.CachePercent(stats)));
+    })),
+    ("Cache rates prefer dedicated counters and require complete fallback data", () => Sync(() =>
+    {
+        var stats = new RequestStats { InputTokens = 50, CacheCreationInputTokens = 10, CacheReadInputTokens = 60 };
+        Equal(50m, AccountDetails.CachePercent(stats));
+        stats.CacheRateReadTokens = 10; stats.CacheRateEligibleTokens = 100;
+        Equal(10m, AccountDetails.CachePercent(stats));
+        foreach (var value in new RequestStats[] { new(),
+            new() { CacheReadInputTokens = 60, CacheCreationInputTokens = 10 },
+            new() { InputTokens = 50, CacheReadInputTokens = 60 },
+            new() { CacheRateReadTokens = 0, CacheRateEligibleTokens = 0 },
+            new() { CacheRateReadTokens = 101, CacheRateEligibleTokens = 100 },
+            new() { CacheRateReadTokens = -1, CacheRateEligibleTokens = 100 } })
+            Equal(null, AccountDetails.CachePercent(value));
+        Equal(0m, AccountDetails.CachePercent(new() { CacheRateReadTokens = 0, CacheRateEligibleTokens = 100 }));
+        Equal("—", AccountDetails.Percentage(null));
+    })),
+    ("Request cards use shared rolling windows without inventing remaining quota", () => Sync(() =>
+    {
+        var response = JsonSerializer.Deserialize<ApiEnvelope<SubscriptionResponse>>(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "request-count.json")), KrillJson.Options)!.Data!;
+        var shared = response.RequestCountQuota!;
+        Equal(95L, shared.Used5h); Equal(100L, shared.Limit5h); Equal(100L, response.Subscriptions[0].Plan.RateLimit5h);
+        var windows = AccountDetails.Windows(shared);
+        Equal(5d, windows[0].Percent); Equal(70d, windows[1].Percent); Equal(80.5d, windows[2].Percent);
+        var quota = QuotaProjection.From(response.Subscriptions[0], shared);
+        Equal("按次额度 · 5 小时", quota.Cycle); Equal(5m, quota.Remaining); Equal(5d, quota.Percent);
+        Equal("周期 2099-10-01 ~ 2099-11-01", AccountDetails.Cycle(shared));
+        Equal(null, QuotaProjection.From(response.Subscriptions[0]).Remaining);
+        shared.Used5h = null;
+        Equal(70d, QuotaProjection.From(response.Subscriptions[0], shared).Percent);
+        shared.Used5h = -1; Equal(null, AccountDetails.Windows(shared)[0].Percent);
+    })),
+    ("Reset cards preserve history, usable subscriptions and exact expiry", async () =>
+    {
+        var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "reset-cards.json"));
+        var cards = JsonSerializer.Deserialize<ApiEnvelope<ResetCardsResponse>>(json, KrillJson.Options)!.Data!.Items;
+        var now = DateTimeOffset.Parse("2099-10-20T00:00:00Z", CultureInfo.InvariantCulture);
+        var states = new[] { ResetCardState.Unused, ResetCardState.Used, ResetCardState.Revoked, ResetCardState.Expired, ResetCardState.Unused, ResetCardState.Unknown, ResetCardState.Expired };
+        for (var i = 0; i < cards.Count; i++) Equal(states[i], AccountDetails.State(cards[i], now));
+        Equal(1, cards.Count(x => AccountDetails.CanUse(x, now)));
+        Equal(30m, cards[0].CapUsd); Equal(12.50m, cards[1].GrantedUsd);
+        Equal("可用 · 1 个订阅", AccountDetails.AvailabilityText(cards[0], now));
+        Equal("未使用 · 暂无适用订阅", AccountDetails.AvailabilityText(cards[4], now));
+        Equal(false, AccountDetails.CanUse(cards[0], now.AddDays(1)));
+        using var http = new HttpClient(new Handler(request =>
+        {
+            Equal(HttpMethod.Get, request.Method); Equal("https://www.krill-code.com/api/reset-cards", request.RequestUri!.AbsoluteUri);
+            Equal(null, request.Content); Equal("syntheticxx.payloadxx.signaturexx", request.Headers.Authorization!.Parameter);
+            return Task.FromResult(Json(json));
+        }));
+        Equal(7, (await new KrillApiClient(http).GetResetCardsAsync("syntheticxx.payloadxx.signaturexx")).Items.Count);
+    }),
+
     ("Monthly rollover skips exhausted, expired and upcoming cards and prefers another month", () => Sync(() =>
     {
         var json = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "subscription-selection.json"));

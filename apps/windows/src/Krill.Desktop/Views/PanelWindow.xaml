@@ -101,6 +101,11 @@
                                 <Border Style="{StaticResource Card}" Padding="17,14"><StackPanel><TextBlock Text="充值余额 / USD" Style="{StaticResource SectionLabel}" /><TextBlock Text="{Binding CreditText}" FontSize="25" FontWeight="SemiBold" Margin="0,6,0,0" /></StackPanel></Border>
                                 <Border Grid.Column="2" Style="{StaticResource Card}" Padding="17,14"><StackPanel><TextBlock Text="福利余额 / USD" Style="{StaticResource SectionLabel}" /><TextBlock Text="{Binding WelfareText}" FontSize="25" FontWeight="SemiBold" Margin="0,6,0,0" /></StackPanel></Border>
                             </Grid>
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,16"><StackPanel>
+                                <DockPanel><TextBlock Text="今日请求" Style="{StaticResource Muted}" /><TextBlock Text="{Binding RequestsText}" DockPanel.Dock="Right" HorizontalAlignment="Right" /></DockPanel>
+                                <DockPanel Margin="0,12,0,0"><TextBlock Text="缓存率" Style="{StaticResource Muted}" /><TextBlock Text="{Binding CacheRateText}" HorizontalAlignment="Right" /></DockPanel>
+                                <DockPanel Margin="0,12,0,0"><TextBlock Text="重置卡" Style="{StaticResource Muted}" /><TextBlock Text="{Binding ResetCardsSummary}" HorizontalAlignment="Right" /></DockPanel>
+                            </StackPanel></Border>
                             <Grid Margin="1,0,1,10"><TextBlock Text="最新公告" FontWeight="SemiBold" /><TextBlock Text="{Binding UnreadText}" Foreground="{StaticResource SubtleBrush}" FontSize="11" HorizontalAlignment="Right" /></Grid>
                             <ItemsControl ItemsSource="{Binding RecentAnnouncements}">
                                 <ItemsControl.ItemTemplate><DataTemplate>
@@ -132,12 +137,34 @@
                                         <DockPanel><TextBlock Text="{Binding Limit, StringFormat=上限 {0}}" DockPanel.Dock="Right" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" FontSize="11" /><TextBlock Text="{Binding Remaining}" FontSize="26" FontWeight="SemiBold" Foreground="{Binding Accent}" /></DockPanel>
                                         <ProgressBar Style="{StaticResource QuotaBar}" Foreground="{Binding Accent}" Value="{Binding Percent, Mode=OneWay}" Margin="0,12,0,12" />
                                         <TextBlock Text="{Binding Used, StringFormat=已用 {0}}" Style="{StaticResource Muted}" />
+                                        <StackPanel Visibility="{Binding IsRequestCount, Converter={StaticResource BoolVisibility}}" Margin="0,12,0,0">
+                                            <TextBlock Text="狂蹬卡 / 按次额度 · 账号共享限额" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                            <ItemsControl ItemsSource="{Binding RequestWindows}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,0,0,10">
+                                                <DockPanel><TextBlock Text="{Binding Label}" Style="{StaticResource Muted}" /><TextBlock Text="{Binding Detail}" HorizontalAlignment="Right" FontSize="11" /></DockPanel>
+                                                <ProgressBar Style="{StaticResource QuotaBar}" Value="{Binding Percent, Mode=OneWay}" Margin="0,6,0,0" />
+                                            </StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                            <TextBlock Text="{Binding RequestCycle}" TextWrapping="Wrap" Style="{StaticResource Muted}" FontSize="10" />
+                                        </StackPanel>
                                         <TextBlock Text="{Binding Forwarded, StringFormat=另有结转 {0}}" Foreground="#A9C7D6" FontSize="11" Margin="0,5,0,0" Visibility="{Binding HasForwarded, Converter={StaticResource BoolVisibility}}" />
                                         <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,14,0,11" />
                                         <Grid><TextBlock Text="{Binding Reset}" FontSize="10" Foreground="{StaticResource MutedBrush}" /><TextBlock Text="{Binding Expiry}" FontSize="10" Foreground="{StaticResource SubtleBrush}" HorizontalAlignment="Right" /></Grid>
                                     </StackPanel>
                                 </Border>
                             </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <TextBlock Text="重置卡" FontSize="20" FontWeight="SemiBold" Margin="0,12,0,10" />
+                            <TextBlock Text="{Binding ResetCardsSummary}" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,8" />
+                            <TextBlock Text="{Binding ResetCardsNote}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14" />
+                            <ItemsControl ItemsSource="{Binding ResetCards}"><ItemsControl.ItemTemplate><DataTemplate>
+                                <Border Style="{StaticResource Card}" Margin="0,0,0,12" Opacity="{Binding Opacity}"><StackPanel>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding State}" Foreground="{StaticResource AccentBrush}" Margin="0,8,0,12" />
+                                    <DockPanel><TextBlock Text="单张恢复上限" Style="{StaticResource Muted}" /><TextBlock Text="{Binding Cap}" HorizontalAlignment="Right" /></DockPanel>
+                                    <TextBlock Text="{Binding Expiry}" Style="{StaticResource Muted}" Margin="0,12,0,0" />
+                                    <TextBlock Text="{Binding Usage}" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding Note}" Style="{StaticResource Muted}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                </StackPanel></Border>
+                            </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            <Button Content="在官网管理重置卡 ↗" Command="{Binding OpenWebsiteCommand}" CommandParameter="/app" Style="{StaticResource GhostButton}" Margin="0,0,0,16" />
                             <TextBlock Text="金额单位为 USD。结转额度单独显示；套餐变更、续费与支付请前往官网。" TextWrapping="Wrap" Style="{StaticResource Muted}" FontSize="11" LineHeight="19" />
                         </StackPanel>
                     </ScrollViewer>
@@ -163,6 +190,20 @@
                                 <Grid Margin="0,0,0,15"><TextBlock Text="请求成功率" Style="{StaticResource Muted}" /><TextBlock Text="{Binding SuccessRateText}" HorizontalAlignment="Right" /></Grid>
                                 <Grid Margin="0,0,0,15"><TextBlock Text="输入 Tokens" Style="{StaticResource Muted}" /><TextBlock Text="{Binding InputTokensText}" HorizontalAlignment="Right" /></Grid>
                                 <Grid><TextBlock Text="输出 Tokens" Style="{StaticResource Muted}" /><TextBlock Text="{Binding OutputTokensText}" HorizontalAlignment="Right" /></Grid>
+                                <ItemsControl ItemsSource="{Binding UsageDetails}" Margin="0,15,0,0"><ItemsControl.ItemTemplate><DataTemplate>
+                                    <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,12,0" /><TextBlock Text="{Binding Value}" Grid.Column="1" />
+                                    </Grid>
+                                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                            </StackPanel></Border>
+                            <Border Style="{StaticResource Card}" Margin="0,16,0,0"><StackPanel>
+                                <TextBlock Text="缓存用量" FontWeight="SemiBold" Margin="0,0,0,16" />
+                                <ItemsControl ItemsSource="{Binding CacheDetails}"><ItemsControl.ItemTemplate><DataTemplate>
+                                    <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,12,0" /><TextBlock Text="{Binding Value}" Grid.Column="1" />
+                                    </Grid>
+                                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                <TextBlock Text="优先使用官网缓存统计口径；缺失时按缓存读取 /（输入 + 缓存写入 + 缓存读取）计算。" Style="{StaticResource Muted}" FontSize="10" TextWrapping="Wrap" />
                             </StackPanel></Border>
                             <Button Content="在官网查看完整用量记录 ↗" Command="{Binding OpenWebsiteCommand}" CommandParameter="/app/logs" Style="{StaticResource GhostButton}" Margin="0,14,0,0" />
                         </StackPanel>

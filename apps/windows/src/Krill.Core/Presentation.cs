@@ -10,12 +10,16 @@ public sealed record QuotaProjection(string Cycle, decimal? Limit, decimal? Used
     public double? Percent => Limit > 0 && Remaining.HasValue
         ? (double)Math.Clamp(Remaining.Value / Limit.Value * 100m, 0m, 100m) : null;
 
-    public static QuotaProjection From(Subscription subscription)
+    public static QuotaProjection From(Subscription subscription, RequestCountQuota? requestCountQuota = null)
     {
         var q = subscription.Quota;
         var type = subscription.Plan.BillingType;
         if (type == "request_count")
+        {
+            var window = AccountDetails.Windows(requestCountQuota).Where(x => x.Percent is not null).OrderBy(x => x.Percent).FirstOrDefault();
+            if (window is not null) return new("按次额度 · " + window.Label, window.Limit, window.Used, window.Remaining, null, null, false, "次");
             return new("按次额度", q.LimitRequests, q.UsedRequests, q.RemainingRequests, null, q.WindowResetAt, false, "次");
+        }
         if (subscription.Plan.TotalCredits.HasValue || q.LimitCredits.HasValue)
             return new("积分额度", q.LimitCredits ?? subscription.Plan.TotalCredits, q.UsedCredits, q.RemainingCredits,
                 null, q.WindowResetAt, false, "积分");
@@ -26,6 +30,7 @@ public sealed record QuotaProjection(string Cycle, decimal? Limit, decimal? Used
 
 public static partial class DisplayFormat
 {
+    public static string Number(decimal value, int digits = 2) => value.ToString("N" + digits, CultureInfo.InvariantCulture);
     public static string Money(decimal? value) => value.HasValue ? "$" + value.Value.ToString("N2", CultureInfo.InvariantCulture) : "—";
     public static string Cost(decimal? value) => value.HasValue ? "$" + value.Value.ToString(value.Value is > 0 and < 1 ? "0.0000" : "N2", CultureInfo.InvariantCulture) : "—";
     public static string Count(long value) => value.ToString("N0", CultureInfo.InvariantCulture);

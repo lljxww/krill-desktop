@@ -9,6 +9,7 @@
 | 确认身份 | `GET /api/auth/me` | Krill 会话 | 无 |
 | 套餐、额度、余额 | `GET /api/subscription` | Krill 会话 | 无 |
 | 今日统计 | `POST /api/request-logs/stats` | Krill 会话 | `start_time`、`end_time`，UTC ISO8601 |
+| 重置卡状态、上限与适用订阅 | `GET /api/reset-cards` | Krill 会话 | 无 |
 | 公告 | `GET /api/public/announcements` | 无 | 无 |
 
 已认证请求同时携带 `Authorization: Bearer …` 与 `Cookie: krill_jwt=…`，沿用网站现有要求。语言头为 `X-Language: zh-CN`、`Accept-Language: zh-CN`。公共公告请求不携带账号会话。客户端只提供固定接口与官网跳转枚举，不接受外部传入的任意凭据目标地址。
@@ -28,6 +29,14 @@
 - 过期、用尽、未生效、冻结及其他不可用套餐保留在列表中并置灰，分别显示状态，排除在选择器外。已知的生效 / 到期边界由本地计时检查触发，即使当时没有网络响应也会更新展示；额度消耗仍以接口刷新结果为准。没有有效套餐时显示充值余额，macOS 菜单栏使用金额标志，设置中可同时显示余额数字。
 - 重置和到期时间来自服务端 ISO8601 字段，转换为本机时区。今日统计范围为本机当天零点到当前时间，按各时刻自己的时区偏移转换为 UTC，覆盖夏令时变化。
 
+## 扩展账号与统计数据
+
+- 重置卡来自 `/api/reset-cards` 的 `items`：`id`、`plan_name`、`status`（0 未使用 / 1 已使用 / 2 已作废）、`expired`、`expires_at`、`cap_usd`、`granted_usd`、`used_at`、`note` 和 `usable_subscriptions[].subscription_id`。已使用 / 作废优先于到期状态，未使用卡片结合服务端标记与本地时间判定过期。只有未过期、未使用且适用订阅非空的卡才计为可用；未知状态与缺失适用订阅不推断可用。应用只查询状态，使用与预览跳转官网。
+- 狂蹬卡等 `request_count` 套餐展示订阅响应顶层 `request_count_quota` 的共享限额：`used_5h` / `limit_5h`、`used_weekly` / `limit_weekly`、`used_monthly` / `limit_monthly`，以及 `cycle_start` / `cycle_end`。这些是账号共享统计，不乘以卡片数。概览、菜单栏 / 悬浮球显示已知有效窗口中剩余比例最低的一档。没有完整使用数据时仅展示 `plan.rate_limit_5h` / `rate_limit_weekly` / `rate_limit_monthly` 的上限；不根据上限推断已用或剩余，既有 `quota.limit_requests` 等字段仍兼容。
+- 今日统计新增 `failed_requests`、`cache_read_input_tokens`、`cache_creation_input_tokens`、`reasoning_tokens`、`rpm`、`tpm` 和 `channel_cache_rates[].channel_name` / `cache_rate`。渠道缓存率为 0–1 比例，界面转为百分数。
+- 总缓存率优先使用 `cache_rate_read_tokens / cache_rate_eligible_tokens`；这两个专用字段未同时提供时，只有输入、缓存写入、缓存读取三个计数均已知才回退到 `cache_read_input_tokens / (input_tokens + cache_creation_input_tokens + cache_read_input_tokens)`。零分母、负数、不一致计数或缺失数据均显示 `—`；已知 0 命中且分母大于零显示 `0.0%`。不使用总 Tokens 或请求数充当缓存率分母。
+- 重置卡在展开详情后随刷新加载，成功后至少间隔 30 秒再请求；接口暂不可用时保留当前账号上次成功结果，独立显示错误，不阻断套餐、统计和公告。401 沿用全局会话失效处理。切换账号 / 退出会清空扩展数据并拒绝旧代次回写；已知重置卡到期时间也在本地更新。
+
 ## 刷新与会话
 
 默认后台 60 秒；展开详情时核心数据至多间隔 30 秒。统计在详情展开后加载；公告约每 10 分钟检查一次。失败按次数增加等待，最长约 300 秒；失败时保留当前进程中上次成功的数据，并标记离线。退出 / 切换账号时增加会话代次并取消旧任务，旧响应不得写入新账号面板。
@@ -42,6 +51,6 @@
 
 ## 共用样例
 
-`contracts/fixtures/subscriptions.json`、`stats.json`、`subscription-selection.json` 为手工创建的虚构数据，不含真实账号。Windows 契约程序和 Swift `ProtocolTests` 读取同一组文件，验证：金额字符串、当前周期与生命周期区分、结转独立、按次 / 积分额度、未知值、统计小金额精度，以及月卡用尽 / 到期 / 未生效 / 结转 / 自动选择边界。
+`contracts/fixtures/subscriptions.json`、`stats.json`、`subscription-selection.json`、`request-count.json`、`reset-cards.json` 为手工创建的虚构数据，不含真实账号。Windows 契约程序和 Swift `ProtocolTests` 读取同一组文件，验证：金额字符串、当前周期与生命周期区分、结转独立、按次 / 积分额度、未知值、统计小金额精度，以及月卡用尽 / 到期 / 未生效 / 结转 / 自动选择边界。
 
 修改展示规则时同时更新两端实现、共用样例和断言。Swift 测试读取仓库内的相对路径，迁移时应复制完整仓库。

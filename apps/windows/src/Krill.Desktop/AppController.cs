@@ -25,6 +25,7 @@ public sealed class AppController : IDisposable
     private bool _savingPreferences;
     private bool _disposed;
     private DateTimeOffset _lastAnnouncements;
+    private DateTimeOffset _lastResetCards;
 
     public DashboardViewModel ViewModel { get; }
     public OrbWindow Orb { get; }
@@ -134,6 +135,8 @@ public sealed class AppController : IDisposable
             ViewModel.ApplyCore(_profile, await subscriptions);
             _failures = 0;
             var optional = new List<Task>();
+            if (includeDetails && (_lastResetCards == default || DateTimeOffset.UtcNow - _lastResetCards >= TimeSpan.FromSeconds(30)))
+                optional.Add(LoadResetCardsAsync(token, generation, ct));
             if (includeDetails) optional.Add(LoadStatsAsync(token, generation, ct));
             if (_lastAnnouncements == default || DateTimeOffset.UtcNow - _lastAnnouncements > TimeSpan.FromMinutes(10))
                 optional.Add(LoadAnnouncementsAsync(generation, ct));
@@ -171,6 +174,25 @@ public sealed class AppController : IDisposable
             else ViewModel.StatsNote = "今日统计暂时无法更新，已保留上次结果。";
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+    }
+
+    private async Task LoadResetCardsAsync(string token, int generation, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _api.GetResetCardsAsync(token, ct);
+            if (generation != _generation) return;
+            ViewModel.ApplyResetCards(result); _lastResetCards = DateTimeOffset.UtcNow;
+        }
+        catch (KrillApiException e)
+        {
+            if (generation != _generation) return;
+            if (e.Failure == ApiFailure.SessionExpired) HandleFailure(e);
+            else ViewModel.ReportResetCardsFailure();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (Exception e)
+        { _storage.Log("reset_cards_refresh_failed", e); if (generation == _generation) ViewModel.ReportResetCardsFailure(); }
     }
 
     private async Task LoadAnnouncementsAsync(int generation, CancellationToken ct)
@@ -226,6 +248,7 @@ public sealed class AppController : IDisposable
         var now = DateTimeOffset.Now;
         ViewModel.ApplyCore(DemoData.Profile, DemoData.Subscriptions(now), demo: true);
         ViewModel.ApplyStats(DemoData.Stats(now)); ViewModel.ApplyAnnouncements(DemoData.Announcements(now));
+        ViewModel.ApplyResetCards(DemoData.ResetCards(now));
         _tray?.Update(ViewModel.OrbText);
     }
 
@@ -233,7 +256,7 @@ public sealed class AppController : IDisposable
     {
         _generation++; _session.Cancel(); _session.Dispose();
         _session = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
-        _lastAnnouncements = default;
+        _lastAnnouncements = default; _lastResetCards = default;
     }
 
     private void SignOut()

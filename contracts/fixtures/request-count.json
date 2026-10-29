@@ -1,0 +1,31 @@
+{
+  "success": true,
+  "code": 200,
+  "data": {
+    "request_count_quota": {
+      "used_5h": "95",
+      "limit_5h": "100",
+      "used_weekly": 300,
+      "limit_weekly": "1000",
+      "used_monthly": "780",
+      "limit_monthly": 4000,
+      "cycle_start": "2099-10-01",
+      "cycle_end": "2099-11-01"
+    },
+    "subscriptions": [
+      {
+        "subscription_id": 501,
+        "status": "active",
+        "consume_priority": 1,
+        "plan": {
+          "name": "Sample request card",
+          "billing_type": "request_count",
+          "rate_limit_5h": "100",
+          "rate_limit_weekly": 1000,
+          "rate_limit_monthly": "4000"
+        },
+        "quota": {}
+      }
+    ]
+  }
+}

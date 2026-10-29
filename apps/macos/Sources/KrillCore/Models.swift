@@ -15,7 +15,7 @@ public enum KrillJSON {
     }
 }
 
-private extension KeyedDecodingContainer {
+extension KeyedDecodingContainer {
     func decimal(_ key: Key) throws -> Decimal? {
         guard contains(key) else { return nil }
         if try decodeNil(forKey: key) { return nil }
@@ -58,18 +58,21 @@ public struct UserProfile: Decodable, Sendable {
 }
 
 public struct SubscriptionResponse: Decodable, Sendable {
+    public var requestCountQuota: RequestCountQuota?
     public var subscriptions: [Subscription]
     public var creditBalanceUsd: Decimal?
     public var welfareBalanceUsd: Decimal?
-    enum CodingKeys: String, CodingKey { case subscriptions, creditBalanceUsd, welfareBalanceUsd }
+    enum CodingKeys: String, CodingKey { case subscriptions, creditBalanceUsd, welfareBalanceUsd, requestCountQuota }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         subscriptions = try c.decodeIfPresent([Subscription].self, forKey: .subscriptions) ?? []
         creditBalanceUsd = try c.decimal(.creditBalanceUsd)
         welfareBalanceUsd = try c.decimal(.welfareBalanceUsd)
+        requestCountQuota = try c.decodeIfPresent(RequestCountQuota.self, forKey: .requestCountQuota)
     }
-    public init(subscriptions: [Subscription], creditBalanceUsd: Decimal?, welfareBalanceUsd: Decimal?) {
+    public init(subscriptions: [Subscription], creditBalanceUsd: Decimal?, welfareBalanceUsd: Decimal?, requestCountQuota: RequestCountQuota? = nil) {
         self.subscriptions = subscriptions; self.creditBalanceUsd = creditBalanceUsd; self.welfareBalanceUsd = welfareBalanceUsd
+        self.requestCountQuota = requestCountQuota
     }
 }
 
@@ -103,11 +106,14 @@ public struct Subscription: Decodable, Identifiable, Sendable {
 }
 
 public struct Plan: Decodable, Sendable {
+    public var rateLimit5h: Int64?
+    public var rateLimitWeekly: Int64?
+    public var rateLimitMonthly: Int64?
     public var name = "Krill 套餐"
     public var billingType: String?
     public var totalCredits: Decimal?
     public var durationDays: Int64?
-    enum CodingKeys: String, CodingKey { case name, billingType, totalCredits, durationDays }
+    enum CodingKeys: String, CodingKey { case name, billingType, totalCredits, durationDays, rateLimit5h = "rateLimit5H", rateLimitWeekly, rateLimitMonthly }
     public init(name: String = "Krill 套餐", billingType: String? = nil, totalCredits: Decimal? = nil, durationDays: Int64? = nil) {
         self.name = name; self.billingType = billingType; self.totalCredits = totalCredits; self.durationDays = durationDays
     }
@@ -117,6 +123,7 @@ public struct Plan: Decodable, Sendable {
         billingType = try c.decodeIfPresent(String.self, forKey: .billingType)
         totalCredits = try c.decimal(.totalCredits)
         durationDays = try c.integer(.durationDays)
+        rateLimit5h = try c.integer(.rateLimit5h); rateLimitWeekly = try c.integer(.rateLimitWeekly); rateLimitMonthly = try c.integer(.rateLimitMonthly)
     }
 }
 
@@ -150,20 +157,37 @@ public struct Quota: Decodable, Sendable {
 }
 
 public struct RequestStats: Decodable, Sendable {
+    public var failedRequests: Int64?
+    public var cacheReadInputTokens: Int64?
+    public var cacheCreationInputTokens: Int64?
+    public var cacheRateEligibleTokens: Int64?
+    public var cacheRateReadTokens: Int64?
+    public var reasoningTokens: Int64?
+    public var rpm: Decimal?
+    public var tpm: Decimal?
+    public var channelCacheRates: [ChannelCacheRate] = []
     public var totalRequests: Int64
     public var successRequests: Int64
     public var totalTokens: Int64
-    public var inputTokens: Int64
+    public var inputTokens: Int64?
     public var outputTokens: Int64
     public var totalCostUsd: Decimal?
     public var trend: [TrendBucket]
-    enum CodingKeys: String, CodingKey { case totalRequests, successRequests, totalTokens, inputTokens, outputTokens, totalCostUsd, trend }
+    enum CodingKeys: String, CodingKey {
+        case totalRequests, successRequests, failedRequests, totalTokens, inputTokens, outputTokens, totalCostUsd, trend
+        case cacheReadInputTokens, cacheCreationInputTokens, cacheRateEligibleTokens, cacheRateReadTokens, reasoningTokens, rpm, tpm, channelCacheRates
+    }
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         totalRequests = try c.integer(.totalRequests) ?? 0; successRequests = try c.integer(.successRequests) ?? 0
-        totalTokens = try c.integer(.totalTokens) ?? 0; inputTokens = try c.integer(.inputTokens) ?? 0
+        totalTokens = try c.integer(.totalTokens) ?? 0; inputTokens = try c.integer(.inputTokens)
         outputTokens = try c.integer(.outputTokens) ?? 0; totalCostUsd = try c.decimal(.totalCostUsd)
         trend = try c.decodeIfPresent([TrendBucket].self, forKey: .trend) ?? []
+        failedRequests = try c.integer(.failedRequests)
+        cacheReadInputTokens = try c.integer(.cacheReadInputTokens); cacheCreationInputTokens = try c.integer(.cacheCreationInputTokens)
+        cacheRateEligibleTokens = try c.integer(.cacheRateEligibleTokens); cacheRateReadTokens = try c.integer(.cacheRateReadTokens)
+        reasoningTokens = try c.integer(.reasoningTokens); rpm = try c.decimal(.rpm); tpm = try c.decimal(.tpm)
+        channelCacheRates = try c.decodeIfPresent([ChannelCacheRate].self, forKey: .channelCacheRates) ?? []
     }
     public init(requests: Int64, successes: Int64, tokens: Int64, input: Int64, output: Int64, cost: Decimal, trend: [TrendBucket]) {
         totalRequests = requests; successRequests = successes; totalTokens = tokens
